@@ -1,0 +1,155 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Modifier Port — {{ device.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">
+            <i class="mdi mdi-swap-horizontal text-primary"></i>
+            Modifier la Connexion — <span class="text-primary">{{ device.name }}</span>
+        </h2>
+        <a href="{% url 'plugins:netbox_device_search:device_detail' device.id %}" class="btn btn-outline-secondary">
+            <i class="mdi mdi-arrow-left"></i> Retour au détail
+        </a>
+    </div>
+
+    <!-- Connexion actuelle -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-start border-info border-3 shadow-sm">
+                <div class="card-header">
+                    <i class="mdi mdi-information-outline text-info"></i> Connexion actuelle
+                </div>
+                <div class="card-body">
+                    {% if switch %}
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Switch</td>
+                            <td><strong>{{ switch.name }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Port</td>
+                            <td><code>{{ switch_port }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Câble(s)</td>
+                            <td>
+                                {% for p in patching %}
+                                <span class="badge bg-secondary">{{ p.cable_label }}</span>
+                                <small class="text-muted">{{ p.cable_type }} · {{ p.cable_status }}</small>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    </table>
+                    {% else %}
+                    <div class="text-muted">
+                        <i class="mdi mdi-alert-outline text-warning"></i>
+                        Aucune connexion switch enregistrée
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerte port occupé -->
+    {% if port_occupied %}
+    <div class="alert alert-warning border-warning border-2 shadow-sm">
+        <h5><i class="mdi mdi-alert-outline"></i> Port déjà occupé !</h5>
+        <p class="mb-2">
+            Le port <strong>{{ occupied_port.name }}</strong> sur
+            <strong>{{ occupied_port.device.name }}</strong>
+            est déjà utilisé
+            {% if occupied_by %}par <strong>{{ occupied_by.name }}</strong>{% endif %}.
+        </p>
+        <p class="mb-3">Que souhaitez-vous faire ?</p>
+        <div class="d-flex gap-3">
+            <!-- Forcer la mise à jour -->
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="switch_port" value="{{ selected_port_id }}">
+                <input type="hidden" name="cable_type" value="{{ cable_type }}">
+                <input type="hidden" name="cable_label" value="{{ cable_label }}">
+                <input type="hidden" name="force_update" value="1">
+                <button type="submit" class="btn btn-danger">
+                    <i class="mdi mdi-check-bold"></i> Valider quand même — écraser ce port
+                </button>
+            </form>
+            <!-- Annuler et choisir un autre port -->
+            <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}"
+                class="btn btn-outline-secondary">
+                <i class="mdi mdi-refresh"></i> Choisir un autre port
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Formulaire de mise à jour -->
+    {% if not port_occupied %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <i class="mdi mdi-cable-data"></i> Nouvelle Connexion Switch
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Port du switch <span class="text-danger">*</span></label>
+                        <select class="form-select" name="switch_port" required>
+                            <option value="">— Sélectionner un port libre —</option>
+                            {% for port in free_ports %}
+                            <option value="{{ port.id }}">
+                                🔵 {{ port.device.name }} / {{ port.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            Seuls les ports <strong>libres</strong> de switch sont affichés.
+                            Si le port est occupé, une confirmation sera demandée.
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Type de câble</label>
+                        <select class="form-select" name="cable_type">
+                            {% for value, label in cable_types %}
+                            <option value="{{ value }}" {% if value=='cat6' %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Label du câble</label>
+                        <input type="text" class="form-control" name="cable_label" placeholder="Auto si vide">
+                    </div>
+
+                </div>
+
+                <div class="alert alert-info mt-4 mb-3">
+                    <i class="mdi mdi-information-outline"></i>
+                    <strong>Note :</strong> L'ancien câblage du device sera automatiquement supprimé
+                    avant d'établir la nouvelle connexion.
+                </div>
+
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-primary btn-lg px-5">
+                        <i class="mdi mdi-check-bold"></i> Mettre à jour la connexion
+                    </button>
+                    <a href="{% url 'plugins:netbox_device_search:device_detail' device.id %}"
+                        class="btn btn-outline-secondary btn-lg">
+                        Annuler
+                    </a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

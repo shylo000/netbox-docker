@@ -1,0 +1,2 @@
+# Plugin Requirements
+# Notre plugin est local, rien à installer via PyPI

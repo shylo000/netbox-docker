@@ -1,0 +1,281 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}{{ device.name }} — Détail{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="mdi mdi-server text-primary"></i>
+                {{ device.name }}
+            </h2>
+            <span class="badge 
+        {% if device.status == 'active' %}bg-success
+        {% elif device.status == 'planned' %}bg-info
+        {% elif device.status == 'failed' %}bg-danger
+        {% else %}bg-secondary{% endif %} mt-1">
+                {{ device.get_status_display }}
+            </span>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
+                <i class="mdi mdi-arrow-left"></i> Retour
+            </a>
+            <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}" class="btn btn-primary">
+                <i class="mdi mdi-swap-horizontal"></i> Modifier Port/Switch
+            </a>
+            <a href="/dcim/devices/{{ device.id }}/" class="btn btn-outline-primary" target="_blank">
+                <i class="mdi mdi-open-in-new"></i> Netbox
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- Colonne gauche : infos principales -->
+        <div class="col-md-6">
+
+            <!-- Identité -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <i class="mdi mdi-card-account-details-outline"></i>
+                    Identité de l'appareil
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <tbody>
+                            <tr>
+                                <th width="40%" class="ps-3 text-muted">Nom</th>
+                                <td><strong>{{ device.name }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Description</th>
+                                <td>{{ description }}</td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Numéro de série</th>
+                                <td><code>{{ serial }}</code></td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Fabricant</th>
+                                <td>{{ device.device_type.manufacturer.name|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Modèle</th>
+                                <td>{{ device.device_type.model|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Rôle</th>
+                                <td>{{ device.role.name|default:"—" }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Réseau -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="mdi mdi-ip-network-outline"></i>
+                    Informations Réseau
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <tbody>
+                            <tr>
+                                <th width="40%" class="ps-3 text-muted">Adresse IP</th>
+                                <td>
+                                    {% if ip_address %}
+                                    <code class="text-success">{{ ip_address }}</code>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Adresse MAC</th>
+                                <td>
+                                    {% if mac_address %}
+                                    <code class="text-info">{{ mac_address }}</code>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Colonne droite : localisation & connexion -->
+        <div class="col-md-6">
+
+            <!-- Localisation physique -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <i class="mdi mdi-map-marker-outline"></i>
+                    Localisation Physique
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <tbody>
+                            <tr>
+                                <th width="40%" class="ps-3 text-muted">Site</th>
+                                <td>{{ device.site.name|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Rack</th>
+                                <td>
+                                    {% if rack %}
+                                    <span class="badge bg-warning text-dark">{{ rack.name }}</span>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Connexion Switch -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-dark">
+                    <i class="mdi mdi-switch"></i>
+                    Connexion Switch
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <tbody>
+                            <tr>
+                                <th width="40%" class="ps-3 text-muted">Switch</th>
+                                <td>
+                                    {% if switch %}
+                                    <strong class="text-primary">{{ switch.name }}</strong>
+                                    {% else %}
+                                    <span class="text-muted">Non connecté</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="ps-3 text-muted">Port</th>
+                                <td>
+                                    {% if switch_port %}
+                                    <code class="badge bg-info text-dark fs-6">{{ switch_port }}</code>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Patching / Câblage -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white d-flex justify-content-between">
+            <span><i class="mdi mdi-cable-data"></i> Câblage (Patching)</span>
+            <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}"
+                class="btn btn-sm btn-light">
+                <i class="mdi mdi-pencil"></i> Modifier
+            </a>
+        </div>
+        <div class="card-body">
+            {% if patching %}
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Interface locale</th>
+                            <th>Label câble</th>
+                            <th>Type de câble</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in patching %}
+                        <tr>
+                            <td><code>{{ p.interface }}</code></td>
+                            <td>{{ p.cable_label }}</td>
+                            <td>{{ p.cable_type }}</td>
+                            <td>
+                                <span
+                                    class="badge {% if p.cable_status == 'Actif' %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ p.cable_status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-warning mb-0">
+                <i class="mdi mdi-alert-outline"></i>
+                Aucun câblage enregistré pour cet appareil.
+                <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}" class="alert-link">
+                    Ajouter un câblage →
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Interfaces -->
+    {% if interfaces %}
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <i class="mdi mdi-ethernet"></i> Interfaces ({{ interfaces|length }})
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Nom</th>
+                        <th>Type</th>
+                        <th>MAC</th>
+                        <th>IP(s)</th>
+                        <th>Câble</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for iface in interfaces %}
+                    <tr>
+                        <td class="ps-3"><code>{{ iface.name }}</code></td>
+                        <td>{{ iface.get_type_display|default:"—" }}</td>
+                        <td>
+                            {% if iface.mac_address %}
+                            <code class="text-info small">{{ iface.mac_address }}</code>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% for ip in iface.ip_addresses.all %}
+                            <code class="text-success small">{{ ip.address }}</code>
+                            {% empty %}—{% endfor %}
+                        </td>
+                        <td>
+                            {% if iface.cable %}
+                            <span class="badge bg-success">Connecté</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Libre</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

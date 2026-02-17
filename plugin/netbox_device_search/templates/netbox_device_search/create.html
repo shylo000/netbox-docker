@@ -1,0 +1,183 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Créer un Appareil{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">
+            <i class="mdi mdi-plus-circle text-success"></i>
+            Créer un Nouvel Appareil
+        </h2>
+        <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
+            <i class="mdi mdi-arrow-left"></i> Retour
+        </a>
+    </div>
+
+    {% if errors %}
+    <div class="alert alert-danger">
+        <strong><i class="mdi mdi-alert-circle-outline"></i> Erreurs :</strong>
+        <ul class="mb-0 mt-1">
+            {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="row g-4">
+
+            <!-- Section : Identité -->
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        <i class="mdi mdi-card-account-details-outline"></i> Identité de l'appareil
+                    </div>
+                    <div class="card-body">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nom de l'appareil <span
+                                    class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" value="{{ prefill }}"
+                                placeholder="ex: switch-core-01" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Site <span class="text-danger">*</span></label>
+                            <select class="form-select" name="site" required>
+                                <option value="">— Sélectionner un site —</option>
+                                {% for site in sites %}
+                                <option value="{{ site.id }}">{{ site.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Rôle <span class="text-danger">*</span></label>
+                            <select class="form-select" name="role" required>
+                                <option value="">— Sélectionner un rôle —</option>
+                                {% for role in device_roles %}
+                                <option value="{{ role.id }}">{{ role.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Type / Modèle <span class="text-danger">*</span></label>
+                            <select class="form-select" name="device_type" required>
+                                <option value="">— Sélectionner un type —</option>
+                                {% for dt in device_types %}
+                                <option value="{{ dt.id }}">{{ dt.manufacturer.name }} — {{ dt.model }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Rack</label>
+                            <select class="form-select" name="rack">
+                                <option value="">— Aucun rack —</option>
+                                {% for rack in racks %}
+                                <option value="{{ rack.id }}">{{ rack.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Numéro de série</label>
+                            <input type="text" class="form-control" name="serial" placeholder="ex: SN-12345678">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" name="description" rows="2"
+                                placeholder="Informations complémentaires..."></textarea>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section : Réseau & Câblage -->
+            <div class="col-md-6">
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <i class="mdi mdi-ip-network-outline"></i> Informations Réseau
+                    </div>
+                    <div class="card-body">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Adresse MAC</label>
+                            <input type="text" class="form-control" name="mac_address"
+                                placeholder="ex: AA:BB:CC:DD:EE:FF">
+                            <div class="form-text">Format: AA:BB:CC:DD:EE:FF</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Adresse IP</label>
+                            <input type="text" class="form-control" name="ip_address"
+                                placeholder="ex: 192.168.1.100/24">
+                            <div class="form-text">Format: x.x.x.x/masque</div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-dark">
+                        <i class="mdi mdi-cable-data"></i> Câblage / Connexion Switch
+                    </div>
+                    <div class="card-body">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Port du switch</label>
+                            <select class="form-select" name="switch_port">
+                                <option value="">— Pas de câblage pour l'instant —</option>
+                                {% for port in free_ports %}
+                                <option value="{{ port.id }}">{{ port.device.name }} / {{ port.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Uniquement les ports <strong>libres</strong> sont listés</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Type de câble</label>
+                            <select class="form-select" name="cable_type">
+                                <option value="cat6">CAT6</option>
+                                <option value="cat5e">CAT5e</option>
+                                <option value="cat6a">CAT6a</option>
+                                <option value="cat8">CAT8</option>
+                                <option value="smf">Fibre mono-mode</option>
+                                <option value="mmf">Fibre multi-mode</option>
+                                <option value="dac-active">DAC Actif</option>
+                                <option value="dac-passive">DAC Passif</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Label du câble</label>
+                            <input type="text" class="form-control" name="cable_label"
+                                placeholder="ex: Patch-A12 (laissez vide pour auto)">
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Boutons -->
+        <div class="mt-4 d-flex gap-3">
+            <button type="submit" class="btn btn-success btn-lg px-5">
+                <i class="mdi mdi-check-bold"></i> Créer l'appareil
+            </button>
+            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary btn-lg">
+                Annuler
+            </a>
+        </div>
+
+    </form>
+</div>
+{% endblock %}

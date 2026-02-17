@@ -1,14 +1,14 @@
-*.sql.gz
+# Ignore les vrais secrets
+env/*.env
+!env/*.env.example
+
+# Logs
+*.log
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# NetBox runtime
 .netbox
-.python-version
-docker-compose.override.yml
-*.pem
-configuration/*
-!configuration/configuration.py
-!configuration/extra.py
-configuration/ldap/*
-!configuration/ldap/extra.py
-!configuration/ldap/ldap_config.py
-!configuration/logging.py
-!configuration/plugins.py
-super-linter.log

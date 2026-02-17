@@ -1,0 +1,13 @@
+FROM netboxcommunity/netbox:latest
+
+COPY ./plugin_requirements.txt /opt/netbox/
+RUN /usr/local/bin/uv pip install -r /opt/netbox/plugin_requirements.txt
+
+# Copier le plugin dans site-packages où Python peut le trouver
+COPY ./plugin/netbox_device_search /opt/netbox/venv/lib/python3.12/site-packages/netbox_device_search
+
+# Supprimer le cache Python
+RUN rm -rf /etc/netbox/config/__pycache__
+
+# Remplacer plugins.py par notre config
+COPY configuration/plugins.py /etc/netbox/config/plugins.py

@@ -1,0 +1,132 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Résultats — {{ query }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- Barre de recherche en haut -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <form method="get" action="">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="mdi mdi-magnify"></i></span>
+                    <input type="text" class="form-control" name="q" value="{{ query }}"
+                        placeholder="Nom ou adresse MAC...">
+                    <button class="btn btn-primary" type="submit">Rechercher</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
+                <i class="mdi mdi-arrow-left"></i> Nouvelle recherche
+            </a>
+        </div>
+    </div>
+
+    <!-- Aucun résultat -->
+    {% if not_found %}
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="card border-warning shadow-sm">
+                <div class="card-body py-5">
+                    <i class="mdi mdi-help-network-outline text-warning" style="font-size:4rem;"></i>
+                    <h4 class="mt-3">Aucun appareil trouvé</h4>
+                    <p class="text-muted">
+                        Aucun périphérique ne correspond à <strong>« {{ query }} »</strong><br>
+                        ni par son nom, ni par son adresse MAC.
+                    </p>
+                    <hr>
+                    <p class="mb-3">Souhaitez-vous créer cet appareil ?</p>
+                    <a href="{% url 'plugins:netbox_device_search:device_create' %}?q={{ query }}"
+                        class="btn btn-success btn-lg">
+                        <i class="mdi mdi-plus-thick"></i> Créer l'appareil « {{ query }} »
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% elif devices %}
+    <!-- Résultats trouvés -->
+    <h5 class="mb-3">
+        <i class="mdi mdi-check-circle text-success"></i>
+        {{ total }} appareil{{ total|pluralize }} trouvé{{ total|pluralize }} pour <strong>« {{ query }} »</strong>
+    </h5>
+
+    <div class="row">
+        {% for info in devices %}
+        <div class="col-md-6 col-xl-4 mb-4">
+            <div class="card h-100 shadow-sm border-start border-primary border-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>
+                        <i class="mdi mdi-server-network text-primary"></i>
+                        {{ info.device.name }}
+                    </strong>
+                    <span class="badge 
+            {% if info.device.status == 'active' %}bg-success
+            {% elif info.device.status == 'planned' %}bg-info
+            {% elif info.device.status == 'failed' %}bg-danger
+            {% else %}bg-secondary{% endif %}">
+                        {{ info.device.get_status_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted small">Adresse IP</td>
+                            <td><code>{{ info.ip_address|default:"—" }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Adresse MAC</td>
+                            <td><code>{{ info.mac_address|default:"—" }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Site</td>
+                            <td>{{ info.device.site.name|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Rack</td>
+                            <td>{{ info.rack.name|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">Switch</td>
+                            <td>
+                                {% if info.switch %}
+                                <span class="badge bg-primary">{{ info.switch.name }}</span>
+                                <small class="text-muted">/ {{ info.switch_port }}</small>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted small">N° Série</td>
+                            <td>{{ info.serial }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="card-footer d-flex gap-2">
+                    <a href="{% url 'plugins:netbox_device_search:device_detail' info.device.id %}"
+                        class="btn btn-sm btn-primary flex-grow-1">
+                        <i class="mdi mdi-eye"></i> Détail complet
+                    </a>
+                    <a href="{% url 'plugins:netbox_device_search:device_update_port' info.device.id %}"
+                        class="btn btn-sm btn-outline-secondary">
+                        <i class="mdi mdi-swap-horizontal"></i> Modifier port
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="alert alert-info">
+        <i class="mdi mdi-information-outline"></i>
+        Entrez un nom ou une adresse MAC pour lancer la recherche.
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

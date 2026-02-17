@@ -1,6 +1,8 @@
 services:
   netbox: &netbox
     image: docker.io/netboxcommunity/netbox:${VERSION-v4.5-4.0.0}
+    ports:              # ← CORRIGER ICI (ports avec un 's')
+      - "8000:8080"
     depends_on:
       - postgres
       - redis

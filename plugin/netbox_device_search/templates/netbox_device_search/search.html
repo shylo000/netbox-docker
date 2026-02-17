@@ -1,0 +1,81 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Recherche de Périphérique{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-7">
+
+            <!-- Titre -->
+            <div class="text-center mb-4">
+                <h1 class="fw-bold">
+                    <i class="mdi mdi-magnify text-primary"></i>
+                    Recherche de Périphérique
+                </h1>
+                <p class="text-muted">Recherchez un équipement réseau par son <strong>nom</strong> ou son
+                    <strong>adresse MAC</strong></p>
+            </div>
+
+            <!-- Formulaire de recherche -->
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <form method="get" action="{% url 'plugins:netbox_device_search:device_search_results' %}">
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-primary text-white">
+                                <i class="mdi mdi-magnify"></i>
+                            </span>
+                            <input type="text" class="form-control form-control-lg" name="q"
+                                placeholder="Nom du device ou adresse MAC (ex: AA:BB:CC:DD:EE:FF)" autofocus required>
+                            <button type="submit" class="btn btn-primary px-4">
+                                Rechercher
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Aide -->
+            <div class="row mt-4 text-center">
+                <div class="col-md-4">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+                            <i class="mdi mdi-tag-outline fs-2 text-primary"></i>
+                            <p class="mt-2 mb-0 small">Recherche par <strong>nom</strong></p>
+                            <p class="text-muted small">ex: switch-core-01</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+                            <i class="mdi mdi-ethernet fs-2 text-success"></i>
+                            <p class="mt-2 mb-0 small">Recherche par <strong>MAC</strong></p>
+                            <p class="text-muted small">ex: AA:BB:CC:DD:EE:FF</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+                            <i class="mdi mdi-plus-circle-outline fs-2 text-warning"></i>
+                            <p class="mt-2 mb-0 small">Appareil <strong>introuvable</strong> ?</p>
+                            <p class="text-muted small">Créez-le en un clic</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bouton créer -->
+            <div class="text-center mt-4">
+                <a href="{% url 'plugins:netbox_device_search:device_create' %}" class="btn btn-outline-success">
+                    <i class="mdi mdi-plus-thick"></i> Créer un nouvel appareil
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}
