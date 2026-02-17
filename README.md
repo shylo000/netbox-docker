@@ -161,3 +161,47 @@ This repository is currently maintained by the community.
 The community is expected to help each other.
 
 Please consider sponsoring the maintainers of this project.
+
+# NetBox Docker Backup avec Plugin Custom
+
+Ce repository contient une **sauvegarde complète** de ton environnement NetBox Docker avec **plugin personnalisé**, prête à être restaurée **en cas de perte totale**.
+
+## 🔹 Contenu du repo
+
+- `Dockerfile`, `Dockerfile-Plugins` → pour construire les images Docker NetBox
+- `docker-compose.yml` → définition des services NetBox, PostgreSQL et Redis
+- `configuration/` → configuration NetBox et activation du plugin
+- `plugin/netbox_device_search/` → ton plugin NetBox complet
+- `install_plugin.sh` → script pour installer le plugin
+- `plugin_requirements.txt` → dépendances Python du plugin
+- `env/*.env.example` → modèles des fichiers d’environnement (secrets NON inclus)
+- `.gitignore` → ignore les vrais fichiers secrets et logs
+
+> ⚠️ Les vrais fichiers `.env` **ne sont jamais poussés** pour garantir la sécurité.
+
+---
+
+## 🔹 Objectif
+
+Ce repo permet de :
+
+1. **Sauvegarder** ton environnement NetBox + plugin  
+2. **Restaurer rapidement** ton projet si tu perds tout sur WSL  
+3. Garder les **configs et plugin versionnés** sans exposer tes secrets
+
+---
+
+## 🔹 Restauration après perte totale
+
+Si tu perds tout, voici comment remettre NetBox en route :
+
+```bash
+# 1. Cloner le repo
+git clone https://github.com/shylo000/netbox-docker.git
+cd netbox-docker
+
+# 2. Créer les vrais fichiers .env à partir des modèles
+cp env/*.env.example env/*.env
+
+# 3. Lancer Docker et NetBox
+docker compose up -d
