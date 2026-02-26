@@ -3,7 +3,7 @@ from django.views.generic import View
 from django.contrib import messages
 from django.db.models import Q
 
-from dcim.models import Device, Interface, Cable, Site, DeviceRole, DeviceType, Manufacturer, Rack
+from dcim.models import Device, Interface, Cable, CableTermination, Site, DeviceRole, DeviceType, Manufacturer, Rack
 from ipam.models import IPAddress
 
 
@@ -23,8 +23,8 @@ def get_free_switch_ports():
 
 def get_device_full_info(device):
     """
-    Retourne un dictionnaire complet avec toutes les infos d'un device :
-    IP, MAC, switch, port, patch, rack, série...
+    Retourne un dictionnaire complet avec toutes les infos d'un device.
+    Compatible Netbox 4.5 (MACAddress séparé, role au lieu de device_role).
     """
     info = {
         'device': device,
@@ -39,17 +39,25 @@ def get_device_full_info(device):
         'interfaces': [],
     }
 
-    # Récupérer toutes les interfaces
+    # Récupérer toutes les interfaces avec leurs MACs et IPs
     interfaces = Interface.objects.filter(device=device).prefetch_related(
-        'ip_addresses'
-    ).select_related('cable')
+        'ip_addresses', 'mac_addresses'
+    ).select_related('cable', 'primary_mac_address')
 
     for iface in interfaces:
         info['interfaces'].append(iface)
 
-        # Adresse MAC depuis l'interface
-        if iface.mac_address and not info['mac_address']:
-            info['mac_address'] = str(iface.mac_address)
+        # Adresse MAC — Netbox 4.5 : primary_mac_address ou mac_addresses
+        if not info['mac_address']:
+            try:
+                if iface.primary_mac_address:
+                    info['mac_address'] = str(iface.primary_mac_address.mac_address)
+                else:
+                    first_mac = iface.mac_addresses.first()
+                    if first_mac:
+                        info['mac_address'] = str(first_mac.mac_address)
+            except Exception:
+                pass
 
         # Adresse IP
         for ip in iface.ip_addresses.all():
@@ -59,7 +67,6 @@ def get_device_full_info(device):
         # Connexion via câble (switch + port)
         if iface.cable:
             cable = iface.cable
-            # Chercher l'autre bout du câble
             try:
                 all_terms = list(cable.a_terminations.all()) + list(cable.b_terminations.all())
                 for term in all_terms:
@@ -69,7 +76,6 @@ def get_device_full_info(device):
             except Exception:
                 pass
 
-            # Info patching
             info['patching'].append({
                 'cable_label': cable.label or f'Câble #{cable.id}',
                 'cable_type': cable.get_type_display() if cable.type else 'N/A',
@@ -77,13 +83,20 @@ def get_device_full_info(device):
                 'interface': iface.name,
             })
 
+    # IP primaire directement sur le device (plus fiable)
+    if not info['ip_address']:
+        if device.primary_ip4:
+            info['ip_address'] = str(device.primary_ip4.address)
+        elif device.primary_ip6:
+            info['ip_address'] = str(device.primary_ip6.address)
+
     return info
 
 
 def search_devices(query):
     """
     Cherche un device par son nom ou son adresse MAC.
-    Utilise Q objects pour éviter les erreurs de lookup.
+    Compatible Netbox 4.5 avec le modèle MACAddress séparé.
     """
     if not query:
         return Device.objects.none()
@@ -93,17 +106,29 @@ def search_devices(query):
     # Recherche par nom
     by_name = Device.objects.filter(name__icontains=query)
 
-    # Recherche par MAC : dans Netbox 4.5, mac_address est une relation séparée
-    # On cherche dans MACAddress puis on remonte aux interfaces puis aux devices
-    mac_query = query.replace(':', '').replace('-', '').replace('.', '')
+    # Recherche par MAC : dans Netbox 4.5, passer par le modèle MACAddress
+    mac_query = query.replace(':', '').replace('-', '').replace('.', '').upper()
+    by_mac = Device.objects.none()
+    
     try:
         from dcim.models import MACAddress
-        mac_iface_ids = MACAddress.objects.filter(
+        # Chercher les MACs qui matchent
+        matching_macs = MACAddress.objects.filter(
             mac_address__icontains=mac_query
-        ).values_list('assigned_object_id', flat=True)
-        by_mac = Device.objects.filter(interfaces__id__in=mac_iface_ids)
-    except Exception:
-        by_mac = Device.objects.none()
+        ).select_related('assigned_object')
+        
+        # Récupérer les device_ids des interfaces qui ont ces MACs
+        device_ids = []
+        for mac_obj in matching_macs:
+            if mac_obj.assigned_object and hasattr(mac_obj.assigned_object, 'device'):
+                if mac_obj.assigned_object.device:
+                    device_ids.append(mac_obj.assigned_object.device.id)
+        
+        if device_ids:
+            by_mac = Device.objects.filter(id__in=device_ids)
+    except Exception as e:
+        # Fallback si MACAddress n'existe pas ou erreur
+        pass
 
     # Fusionner les résultats
     combined = (by_name | by_mac).distinct().select_related(
@@ -126,25 +151,89 @@ class DeviceSearchView(View):
 
 
 class DeviceSearchResultsView(View):
-    """Résultats de la recherche par nom ou MAC."""
+    """Résultats de la recherche par nom ET/OU MAC."""
     template_name = 'netbox_device_search/results.html'
 
     def get(self, request):
-        query = request.GET.get('q', '').strip()
+        name_query = request.GET.get('name', '').strip()
+        mac_query = request.GET.get('mac', '').strip()
         devices = []
         not_found = False
+        search_error = None
 
-        if query:
-            qs = search_devices(query)
-            devices = [get_device_full_info(d) for d in qs]
+        # ═══════════════════════════════════════════
+        # RECHERCHE PAR NOM
+        # ═══════════════════════════════════════════
+        by_name = Device.objects.none()
+        if name_query:
+            by_name = Device.objects.filter(name__icontains=name_query)
+
+        # ═══════════════════════════════════════════
+        # RECHERCHE PAR MAC - SIMPLIFIÉ POUR NETBOX 4.5
+        # ═══════════════════════════════════════════
+        by_mac = Device.objects.none()
+        if mac_query:
+            try:
+                from dcim.models import MACAddress
+                
+                # Étape 1 : Nettoyer la recherche de l'utilisateur
+                # Enlever TOUS les séparateurs : : - . espaces
+                # Mettre en minuscules (Netbox stocke en lowercase)
+                mac_clean = mac_query.replace(':', '').replace('-', '').replace('.', '').replace(' ', '').lower()
+                
+                if not mac_clean:
+                    search_error = "Adresse MAC vide après nettoyage"
+                elif len(mac_clean) > 12:
+                    search_error = "Adresse MAC trop longue (max 12 caractères hexadécimaux)"
+                else:
+                    # Étape 2 : Récupérer TOUTES les MACs de Netbox
+                    # Note: assigned_object est un GenericForeignKey, pas de select_related possible
+                    all_macs = MACAddress.objects.all()
+                    
+                    device_ids = set()
+                    
+                    # Étape 3 : Pour chaque MAC dans Netbox
+                    for mac_obj in all_macs:
+                        # Nettoyer la MAC stockée dans Netbox pareil
+                        stored_mac = str(mac_obj.mac_address).replace(':', '').replace('-', '').replace('.', '').replace(' ', '').lower()
+                        
+                        # Étape 4 : Vérifier si elle COMMENCE par la recherche
+                        # Ex: recherche "aa" match "aabbccddeeff"
+                        # Ex: recherche "aabb" match "aabbccddeeff"
+                        # Ex: recherche "aabbccddeeff" match exact "aabbccddeeff"
+                        if stored_mac.startswith(mac_clean):
+                            # Étape 5 : Remonter à l'interface puis au device
+                            if mac_obj.assigned_object and hasattr(mac_obj.assigned_object, 'device'):
+                                if mac_obj.assigned_object.device:
+                                    device_ids.add(mac_obj.assigned_object.device.id)
+                    
+                    # Étape 6 : Récupérer les devices trouvés
+                    if device_ids:
+                        by_mac = Device.objects.filter(id__in=device_ids)
+            
+            except ImportError:
+                search_error = "Le modèle MACAddress n'existe pas dans cette version de Netbox"
+            except Exception as e:
+                search_error = f"Erreur recherche MAC: {str(e)}"
+
+        # ═══════════════════════════════════════════
+        # FUSIONNER LES RÉSULTATS
+        # ═══════════════════════════════════════════
+        if name_query or mac_query:
+            combined = (by_name | by_mac).distinct().select_related(
+                'site', 'role', 'device_type', 'device_type__manufacturer', 'rack'
+            )
+            devices = [get_device_full_info(d) for d in combined]
             if not devices:
                 not_found = True
 
         context = {
-            'query': query,
+            'name_query': name_query,
+            'mac_query': mac_query,
             'devices': devices,
             'not_found': not_found,
             'total': len(devices),
+            'search_error': search_error,
         }
         return render(request, self.template_name, context)
 
@@ -223,7 +312,7 @@ class DeviceCreateView(View):
             device = Device(
                 name=name,
                 site_id=site_id,
-                device_role_id=role_id,
+                role_id=role_id,
                 device_type_id=device_type_id,
                 serial=serial,
                 description=description,
@@ -233,14 +322,24 @@ class DeviceCreateView(View):
             device.save()
 
             # Créer l'interface principale
-            iface_data = {
-                'device': device,
-                'name': 'eth0',
-                'type': '1000base-t',
-            }
+            iface = Interface.objects.create(
+                device=device,
+                name='eth0',
+                type='1000base-t',
+            )
+
+            # Dans Netbox 4.5, MAC est un modèle séparé
             if mac_address:
-                iface_data['mac_address'] = mac_address
-            iface = Interface.objects.create(**iface_data)
+                try:
+                    from dcim.models import MACAddress
+                    mac_obj = MACAddress.objects.create(
+                        mac_address=mac_address,
+                        assigned_object=iface,
+                    )
+                    iface.primary_mac_address = mac_obj
+                    iface.save()
+                except Exception as e:
+                    messages.warning(request, f'MAC non assignée : {str(e)}')
 
             # Assigner une IP si fournie
             if ip_address:
@@ -258,14 +357,25 @@ class DeviceCreateView(View):
                 try:
                     switch_port = Interface.objects.get(id=switch_port_id)
                     if switch_port.cable is None:
-                        cable = Cable(
+                        # Netbox 4.5+ : Créer le câble puis les terminations
+                        cable = Cable.objects.create(
                             type=cable_type or 'cat6',
                             label=cable_label or f'{device.name} - {switch_port.device.name}:{switch_port.name}',
                             status='connected',
                         )
-                        cable.save()
-                        cable.a_terminations.set([iface])
-                        cable.b_terminations.set([switch_port])
+                        
+                        # Créer les terminations A et B
+                        CableTermination.objects.create(
+                            cable=cable,
+                            cable_end='A',
+                            termination=iface
+                        )
+                        CableTermination.objects.create(
+                            cable=cable,
+                            cable_end='B',
+                            termination=switch_port
+                        )
+                        
                         messages.success(request, f'Câblage créé vers {switch_port.device.name}/{switch_port.name}')
                     else:
                         messages.warning(request, f'Port {switch_port.name} déjà occupé. Câblage non créé.')
@@ -276,7 +386,10 @@ class DeviceCreateView(View):
             return redirect('plugins:netbox_device_search:device_detail', device_id=device.id)
 
         except Exception as e:
-            messages.error(request, f'Erreur : {str(e)}')
+            error_msg = str(e)
+            if 'unique' in error_msg.lower() or 'duplicate' in error_msg.lower():
+                error_msg = f'Un appareil avec ce nom existe déjà sur ce site. Cherchez-le ou utilisez un nom différent.'
+            messages.error(request, f'Erreur : {error_msg}')
             context = {
                 'errors': [str(e)],
                 'form_data': request.POST,
@@ -381,14 +494,23 @@ class DeviceUpdatePortView(View):
 
         # Créer le nouveau câble
         label = cable_label or f'{device.name} - {switch_port.device.name}:{switch_port.name}'
-        cable = Cable(
+        cable = Cable.objects.create(
             type=cable_type,
             label=label,
             status='connected',
         )
-        cable.save()
-        cable.a_terminations.set([device_iface])
-        cable.b_terminations.set([switch_port])
+        
+        # Créer les terminations A et B (Netbox 4.5+)
+        CableTermination.objects.create(
+            cable=cable,
+            cable_end='A',
+            termination=device_iface
+        )
+        CableTermination.objects.create(
+            cable=cable,
+            cable_end='B',
+            termination=switch_port
+        )
 
         messages.success(request, f'Câblage mis à jour : {device.name} vers {switch_port.device.name}/{switch_port.name}')
         return redirect('plugins:netbox_device_search:device_detail', device_id=device_id)

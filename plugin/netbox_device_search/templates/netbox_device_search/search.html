@@ -6,7 +6,7 @@
 <div class="container-fluid">
 
     <div class="row justify-content-center mt-5">
-        <div class="col-md-7">
+        <div class="col-md-8">
 
             <!-- Titre -->
             <div class="text-center mb-4">
@@ -22,14 +22,30 @@
             <div class="card shadow-sm">
                 <div class="card-body p-4">
                     <form method="get" action="{% url 'plugins:netbox_device_search:device_search_results' %}">
-                        <div class="input-group input-group-lg">
-                            <span class="input-group-text bg-primary text-white">
-                                <i class="mdi mdi-magnify"></i>
-                            </span>
-                            <input type="text" class="form-control form-control-lg" name="q"
-                                placeholder="Nom du device ou adresse MAC (ex: AA:BB:CC:DD:EE:FF)" autofocus required>
-                            <button type="submit" class="btn btn-primary px-4">
-                                Rechercher
+
+                        <!-- Recherche par nom -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="mdi mdi-tag text-primary"></i> Nom de l'appareil
+                            </label>
+                            <input type="text" class="form-control form-control-lg" name="name"
+                                placeholder="ex: switch-core-01, camera2, srv-web..." value="{{ request.GET.name }}">
+                        </div>
+
+                        <!-- Recherche par MAC -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="mdi mdi-ethernet text-success"></i> Adresse MAC
+                            </label>
+                            <input type="text" class="form-control form-control-lg" name="mac"
+                                placeholder="ex: AA:BB:CC:DD:EE:FF ou AABBCCDDEEFF" value="{{ request.GET.mac }}">
+                            <div class="form-text">Formats acceptés : AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="mdi mdi-magnify"></i> Rechercher
                             </button>
                         </div>
                     </form>
@@ -38,30 +54,21 @@
 
             <!-- Aide -->
             <div class="row mt-4 text-center">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <div class="card border-0 bg-light">
                         <div class="card-body">
                             <i class="mdi mdi-tag-outline fs-2 text-primary"></i>
-                            <p class="mt-2 mb-0 small">Recherche par <strong>nom</strong></p>
-                            <p class="text-muted small">ex: switch-core-01</p>
+                            <p class="mt-2 mb-0 small"><strong>Recherche par nom</strong></p>
+                            <p class="text-muted small">Trouvez un appareil par son nom complet ou partiel</p>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <div class="card border-0 bg-light">
                         <div class="card-body">
                             <i class="mdi mdi-ethernet fs-2 text-success"></i>
-                            <p class="mt-2 mb-0 small">Recherche par <strong>MAC</strong></p>
-                            <p class="text-muted small">ex: AA:BB:CC:DD:EE:FF</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card border-0 bg-light">
-                        <div class="card-body">
-                            <i class="mdi mdi-plus-circle-outline fs-2 text-warning"></i>
-                            <p class="mt-2 mb-0 small">Appareil <strong>introuvable</strong> ?</p>
-                            <p class="text-muted small">Créez-le en un clic</p>
+                            <p class="mt-2 mb-0 small"><strong>Recherche par MAC</strong></p>
+                            <p class="text-muted small">Identifiez un device par son adresse physique</p>
                         </div>
                     </div>
                 </div>

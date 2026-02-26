@@ -1,28 +1,51 @@
 {% extends 'base/layout.html' %}
 
-{% block title %}Résultats — {{ query }}{% endblock %}
+{% block title %}Résultats{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
 
     <!-- Barre de recherche en haut -->
     <div class="row mb-4">
-        <div class="col-md-8">
+        <div class="col-md-10">
             <form method="get" action="">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="mdi mdi-magnify"></i></span>
-                    <input type="text" class="form-control" name="q" value="{{ query }}"
-                        placeholder="Nom ou adresse MAC...">
-                    <button class="btn btn-primary" type="submit">Rechercher</button>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="mdi mdi-tag-outline"></i></span>
+                            <input type="text" class="form-control" name="name" value="{{ name_query }}"
+                                placeholder="Nom...">
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="mdi mdi-ethernet"></i></span>
+                            <input type="text" class="form-control" name="mac" value="{{ mac_query }}"
+                                placeholder="Adresse MAC...">
+                        </div>
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-primary w-100" type="submit">
+                            <i class="mdi mdi-magnify"></i>
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
-        <div class="col-md-4 text-end">
-            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
-                <i class="mdi mdi-arrow-left"></i> Nouvelle recherche
+        <div class="col-md-2 text-end">
+            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary w-100">
+                <i class="mdi mdi-arrow-left"></i> Retour
             </a>
         </div>
     </div>
+
+    <!-- Erreur de recherche -->
+    {% if search_error %}
+    <div class="alert alert-danger">
+        <i class="mdi mdi-alert-circle"></i>
+        <strong>Erreur :</strong> {{ search_error }}
+    </div>
+    {% endif %}
 
     <!-- Aucun résultat -->
     {% if not_found %}
@@ -33,14 +56,15 @@
                     <i class="mdi mdi-help-network-outline text-warning" style="font-size:4rem;"></i>
                     <h4 class="mt-3">Aucun appareil trouvé</h4>
                     <p class="text-muted">
-                        Aucun périphérique ne correspond à <strong>« {{ query }} »</strong><br>
-                        ni par son nom, ni par son adresse MAC.
+                        Aucun périphérique ne correspond à votre recherche :
+                        {% if name_query %}<br><strong>Nom :</strong> {{ name_query }}{% endif %}
+                        {% if mac_query %}<br><strong>MAC :</strong> {{ mac_query }}{% endif %}
                     </p>
                     <hr>
                     <p class="mb-3">Souhaitez-vous créer cet appareil ?</p>
-                    <a href="{% url 'plugins:netbox_device_search:device_create' %}?q={{ query }}"
+                    <a href="{% url 'plugins:netbox_device_search:device_create' %}?q={{ name_query|default:mac_query }}"
                         class="btn btn-success btn-lg">
-                        <i class="mdi mdi-plus-thick"></i> Créer l'appareil « {{ query }} »
+                        <i class="mdi mdi-plus-thick"></i> Créer l'appareil
                     </a>
                 </div>
             </div>
@@ -51,7 +75,9 @@
     <!-- Résultats trouvés -->
     <h5 class="mb-3">
         <i class="mdi mdi-check-circle text-success"></i>
-        {{ total }} appareil{{ total|pluralize }} trouvé{{ total|pluralize }} pour <strong>« {{ query }} »</strong>
+        {{ total }} appareil{{ total|pluralize }} trouvé{{ total|pluralize }}
+        {% if name_query %}pour <strong>{{ name_query }}</strong>{% endif %}
+        {% if mac_query %}avec MAC <strong>{{ mac_query }}</strong>{% endif %}
     </h5>
 
     <div class="row">
