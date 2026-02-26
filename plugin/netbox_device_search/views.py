@@ -3,7 +3,7 @@ from django.views.generic import View
 from django.contrib import messages
 from django.db.models import Q
 
-from dcim.models import Device, Interface, Cable, CableTermination, Site, DeviceRole, DeviceType, Manufacturer, Rack
+from dcim.models import Device, Interface, Cable, Site, DeviceRole, DeviceType, Manufacturer, Rack
 from ipam.models import IPAddress
 
 
@@ -357,25 +357,14 @@ class DeviceCreateView(View):
                 try:
                     switch_port = Interface.objects.get(id=switch_port_id)
                     if switch_port.cable is None:
-                        # Netbox 4.5+ : Créer le câble puis les terminations
-                        cable = Cable.objects.create(
+                        cable = Cable(
                             type=cable_type or 'cat6',
                             label=cable_label or f'{device.name} - {switch_port.device.name}:{switch_port.name}',
                             status='connected',
                         )
-                        
-                        # Créer les terminations A et B
-                        CableTermination.objects.create(
-                            cable=cable,
-                            cable_end='A',
-                            termination=iface
-                        )
-                        CableTermination.objects.create(
-                            cable=cable,
-                            cable_end='B',
-                            termination=switch_port
-                        )
-                        
+                        cable.save()
+                        cable.a_terminations.set([iface])
+                        cable.b_terminations.set([switch_port])
                         messages.success(request, f'Câblage créé vers {switch_port.device.name}/{switch_port.name}')
                     else:
                         messages.warning(request, f'Port {switch_port.name} déjà occupé. Câblage non créé.')
@@ -494,23 +483,14 @@ class DeviceUpdatePortView(View):
 
         # Créer le nouveau câble
         label = cable_label or f'{device.name} - {switch_port.device.name}:{switch_port.name}'
-        cable = Cable.objects.create(
+        cable = Cable(
             type=cable_type,
             label=label,
             status='connected',
         )
-        
-        # Créer les terminations A et B (Netbox 4.5+)
-        CableTermination.objects.create(
-            cable=cable,
-            cable_end='A',
-            termination=device_iface
-        )
-        CableTermination.objects.create(
-            cable=cable,
-            cable_end='B',
-            termination=switch_port
-        )
+        cable.save()
+        cable.a_terminations.set([device_iface])
+        cable.b_terminations.set([switch_port])
 
         messages.success(request, f'Câblage mis à jour : {device.name} vers {switch_port.device.name}/{switch_port.name}')
         return redirect('plugins:netbox_device_search:device_detail', device_id=device_id)
