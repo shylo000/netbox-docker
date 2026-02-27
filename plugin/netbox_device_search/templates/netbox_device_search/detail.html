@@ -24,9 +24,19 @@
             <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
                 <i class="mdi mdi-arrow-left"></i> Retour
             </a>
-            <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}" class="btn btn-primary">
-                <i class="mdi mdi-swap-horizontal"></i> Modifier Port/Switch
+
+            <!-- BOUTON VERT : Workflow moderne -->
+            <a href="{% url 'plugins:netbox_device_search:device_connect_site' device.id %}"
+                class="btn btn-success btn-lg">
+                <i class="mdi mdi-plus-network"></i> Connecter à un switch
             </a>
+
+            <!-- Ancien bouton (gardé pour compatibilité) -->
+            <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}"
+                class="btn btn-outline-primary">
+                <i class="mdi mdi-swap-horizontal"></i> Modifier (ancien)
+            </a>
+
             <a href="/dcim/devices/{{ device.id }}/" class="btn btn-outline-primary" target="_blank">
                 <i class="mdi mdi-open-in-new"></i> Netbox
             </a>
@@ -177,56 +187,6 @@
                 </div>
             </div>
 
-        </div>
-    </div>
-
-    <!-- Patching / Câblage -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-secondary text-white d-flex justify-content-between">
-            <span><i class="mdi mdi-cable-data"></i> Câblage (Patching)</span>
-            <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}"
-                class="btn btn-sm btn-light">
-                <i class="mdi mdi-pencil"></i> Modifier
-            </a>
-        </div>
-        <div class="card-body">
-            {% if patching %}
-            <div class="table-responsive">
-                <table class="table table-bordered table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Interface locale</th>
-                            <th>Label câble</th>
-                            <th>Type de câble</th>
-                            <th>Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in patching %}
-                        <tr>
-                            <td><code>{{ p.interface }}</code></td>
-                            <td>{{ p.cable_label }}</td>
-                            <td>{{ p.cable_type }}</td>
-                            <td>
-                                <span
-                                    class="badge {% if p.cable_status == 'Actif' %}bg-success{% else %}bg-danger{% endif %}">
-                                    {{ p.cable_status }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="alert alert-warning mb-0">
-                <i class="mdi mdi-alert-outline"></i>
-                Aucun câblage enregistré pour cet appareil.
-                <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}" class="alert-link">
-                    Ajouter un câblage →
-                </a>
-            </div>
-            {% endif %}
         </div>
     </div>
 

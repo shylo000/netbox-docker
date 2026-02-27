@@ -32,14 +32,19 @@
                                 placeholder="ex: switch-core-01, camera2, srv-web..." value="{{ request.GET.name }}">
                         </div>
 
-                        <!-- Recherche par MAC -->
+                        <!-- Recherche par MAC avec auto-formatage -->
                         <div class="mb-3">
                             <label class="form-label fw-bold">
                                 <i class="mdi mdi-ethernet text-success"></i> Adresse MAC
                             </label>
-                            <input type="text" class="form-control form-control-lg" name="mac"
-                                placeholder="ex: AA:BB:CC:DD:EE:FF ou AABBCCDDEEFF" value="{{ request.GET.mac }}">
-                            <div class="form-text">Formats acceptés : AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF
+                            <input type="text" class="form-control form-control-lg" id="mac_search_input" name="mac"
+                                placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" value="{{ request.GET.mac }}">
+                            <div class="form-text">
+                                <br>
+                                <span class="text-success">✓ Les ":" seront ajoutés automatiquement</span>
+                                <br>
+                                <small class="text-muted">Longueur actuelle : <span id="mac_search_length"
+                                        class="fw-bold">0</span>/17</small>
                             </div>
                         </div>
 
@@ -68,7 +73,7 @@
                         <div class="card-body">
                             <i class="mdi mdi-ethernet fs-2 text-success"></i>
                             <p class="mt-2 mb-0 small"><strong>Recherche par MAC</strong></p>
-                            <p class="text-muted small">Identifiez un device par son adresse physique</p>
+                            <p class="text-muted small">Tapez sans séparateurs, ils s'ajoutent automatiquement !</p>
                         </div>
                     </div>
                 </div>
@@ -85,4 +90,98 @@
     </div>
 
 </div>
+
+<script>
+    // ═══════════════════════════════════════════════════════════════════
+    // AUTO-FORMATAGE DE L'ADRESSE MAC DANS LA RECHERCHE
+    // ═══════════════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', function () {
+        const macInput = document.getElementById('mac_search_input');
+        const macLengthDisplay = document.getElementById('mac_search_length');
+
+        if (!macInput) return;
+
+        // Formater la valeur initiale si elle existe (cas d'une recherche existante)
+        if (macInput.value) {
+            formatMacInput(macInput);
+        }
+
+        // Fonction pour formater la MAC pendant la saisie
+        macInput.addEventListener('input', function (e) {
+            formatMacInput(e.target);
+        });
+
+        // Empêcher le collage de texte non valide
+        macInput.addEventListener('paste', function (e) {
+            e.preventDefault();
+
+            // Récupérer le texte collé
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+
+            // Nettoyer et formater
+            let cleanValue = pastedText.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+            if (cleanValue.length > 12) {
+                cleanValue = cleanValue.substring(0, 12);
+            }
+
+            // Formater avec ":"
+            let formatted = '';
+            for (let i = 0; i < cleanValue.length; i++) {
+                if (i > 0 && i % 2 === 0) {
+                    formatted += ':';
+                }
+                formatted += cleanValue[i];
+            }
+
+            // Insérer dans le champ
+            macInput.value = formatted;
+
+            // Trigger l'événement input pour mettre à jour le compteur
+            macInput.dispatchEvent(new Event('input'));
+        });
+
+        function formatMacInput(input) {
+            let value = input.value;
+
+            // Enlever tous les ":" existants
+            let cleanValue = value.replace(/:/g, '').toUpperCase();
+
+            // Garder seulement les caractères hexadécimaux
+            cleanValue = cleanValue.replace(/[^0-9A-F]/g, '');
+
+            // Limiter à 12 caractères hex maximum
+            if (cleanValue.length > 12) {
+                cleanValue = cleanValue.substring(0, 12);
+            }
+
+            // Ajouter les ":" tous les 2 caractères
+            let formatted = '';
+            for (let i = 0; i < cleanValue.length; i++) {
+                if (i > 0 && i % 2 === 0) {
+                    formatted += ':';
+                }
+                formatted += cleanValue[i];
+            }
+
+            // Mettre à jour le champ
+            input.value = formatted;
+
+            // Mettre à jour l'affichage de la longueur
+            macLengthDisplay.textContent = formatted.length;
+
+            // Changer la couleur selon la longueur
+            if (formatted.length === 17) {
+                macLengthDisplay.classList.remove('text-danger', 'text-warning');
+                macLengthDisplay.classList.add('text-success');
+            } else if (formatted.length > 0) {
+                macLengthDisplay.classList.remove('text-success', 'text-danger');
+                macLengthDisplay.classList.add('text-warning');
+            } else {
+                macLengthDisplay.classList.remove('text-success', 'text-warning');
+                macLengthDisplay.classList.add('text-muted');
+            }
+        }
+    });
+</script>
+
 {% endblock %}

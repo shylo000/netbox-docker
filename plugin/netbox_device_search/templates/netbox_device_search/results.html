@@ -20,9 +20,12 @@
                     <div class="col-md-5">
                         <div class="input-group">
                             <span class="input-group-text"><i class="mdi mdi-ethernet"></i></span>
-                            <input type="text" class="form-control" name="mac" value="{{ mac_query }}"
-                                placeholder="Adresse MAC...">
+                            <input type="text" class="form-control" id="mac_results_input" name="mac"
+                                value="{{ mac_query }}" placeholder="Adresse MAC..." maxlength="17">
                         </div>
+                        <small class="text-muted">
+                            <span id="mac_results_length">0</span>/17
+                        </small>
                     </div>
                     <div class="col-md-1">
                         <button class="btn btn-primary w-100" type="submit">
@@ -155,4 +158,77 @@
     {% endif %}
 
 </div>
+
+<script>
+    // ═══════════════════════════════════════════════════════════════════
+    // AUTO-FORMATAGE MAC DANS LA BARRE DE RECHERCHE DES RÉSULTATS
+    // ═══════════════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', function () {
+        const macInput = document.getElementById('mac_results_input');
+        const macLengthDisplay = document.getElementById('mac_results_length');
+
+        if (!macInput) return;
+
+        // Formater la valeur initiale si elle existe
+        if (macInput.value) {
+            formatMacInput(macInput);
+        }
+
+        macInput.addEventListener('input', function (e) {
+            formatMacInput(e.target);
+        });
+
+        macInput.addEventListener('paste', function (e) {
+            e.preventDefault();
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            let cleanValue = pastedText.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+            if (cleanValue.length > 12) {
+                cleanValue = cleanValue.substring(0, 12);
+            }
+
+            let formatted = '';
+            for (let i = 0; i < cleanValue.length; i++) {
+                if (i > 0 && i % 2 === 0) {
+                    formatted += ':';
+                }
+                formatted += cleanValue[i];
+            }
+
+            macInput.value = formatted;
+            macInput.dispatchEvent(new Event('input'));
+        });
+
+        function formatMacInput(input) {
+            let value = input.value;
+            let cleanValue = value.replace(/:/g, '').toUpperCase();
+            cleanValue = cleanValue.replace(/[^0-9A-F]/g, '');
+
+            if (cleanValue.length > 12) {
+                cleanValue = cleanValue.substring(0, 12);
+            }
+
+            let formatted = '';
+            for (let i = 0; i < cleanValue.length; i++) {
+                if (i > 0 && i % 2 === 0) {
+                    formatted += ':';
+                }
+                formatted += cleanValue[i];
+            }
+
+            input.value = formatted;
+            macLengthDisplay.textContent = formatted.length;
+
+            if (formatted.length === 17) {
+                macLengthDisplay.classList.remove('text-warning');
+                macLengthDisplay.classList.add('text-success');
+            } else if (formatted.length > 0) {
+                macLengthDisplay.classList.remove('text-success');
+                macLengthDisplay.classList.add('text-warning');
+            } else {
+                macLengthDisplay.classList.remove('text-success', 'text-warning');
+            }
+        }
+    });
+</script>
+
 {% endblock %}
