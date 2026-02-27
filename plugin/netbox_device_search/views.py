@@ -3,7 +3,7 @@ from django.views.generic import View
 from django.contrib import messages
 from django.db.models import Q
 
-from dcim.models import Device, Interface, Cable, Site, DeviceRole, DeviceType, Manufacturer, Rack
+from dcim.models import Device, Interface, Cable, CableTermination, Site, DeviceRole, DeviceType, Manufacturer, Rack
 from ipam.models import IPAddress
 
 
@@ -294,6 +294,20 @@ class DeviceCreateView(View):
             errors.append("Le rôle est obligatoire.")
         if not device_type_id:
             errors.append("Le type de device est obligatoire.")
+        
+        # Validation MAC : doit être EXACTEMENT 17 caractères (AA:BB:CC:DD:EE:FF)
+        if mac_address:
+            if len(mac_address) != 17:
+                errors.append(f"L'adresse MAC doit contenir exactement 17 caractères (format AA:BB:CC:DD:EE:FF). Vous avez saisi {len(mac_address)} caractères.")
+            elif mac_address.count(':') != 5:
+                errors.append("L'adresse MAC doit contenir exactement 5 deux-points (:) au format AA:BB:CC:DD:EE:FF.")
+            else:
+                # Vérifier que ce sont bien des caractères hexadécimaux
+                mac_clean = mac_address.replace(':', '')
+                if len(mac_clean) != 12:
+                    errors.append("L'adresse MAC doit contenir exactement 12 caractères hexadécimaux.")
+                elif not all(c in '0123456789ABCDEFabcdef' for c in mac_clean):
+                    errors.append("L'adresse MAC ne doit contenir que des caractères hexadécimaux (0-9, A-F).")
 
         if errors:
             context = {
@@ -357,14 +371,25 @@ class DeviceCreateView(View):
                 try:
                     switch_port = Interface.objects.get(id=switch_port_id)
                     if switch_port.cable is None:
-                        cable = Cable(
+                        # Netbox 4.5+ : Créer le câble puis les terminations
+                        cable = Cable.objects.create(
                             type=cable_type or 'cat6',
                             label=cable_label or f'{device.name} - {switch_port.device.name}:{switch_port.name}',
                             status='connected',
                         )
-                        cable.save()
-                        cable.a_terminations.set([iface])
-                        cable.b_terminations.set([switch_port])
+                        
+                        # Créer les terminations A et B
+                        CableTermination.objects.create(
+                            cable=cable,
+                            cable_end='A',
+                            termination=iface
+                        )
+                        CableTermination.objects.create(
+                            cable=cable,
+                            cable_end='B',
+                            termination=switch_port
+                        )
+                        
                         messages.success(request, f'Câblage créé vers {switch_port.device.name}/{switch_port.name}')
                     else:
                         messages.warning(request, f'Port {switch_port.name} déjà occupé. Câblage non créé.')
@@ -483,14 +508,23 @@ class DeviceUpdatePortView(View):
 
         # Créer le nouveau câble
         label = cable_label or f'{device.name} - {switch_port.device.name}:{switch_port.name}'
-        cable = Cable(
+        cable = Cable.objects.create(
             type=cable_type,
             label=label,
             status='connected',
         )
-        cable.save()
-        cable.a_terminations.set([device_iface])
-        cable.b_terminations.set([switch_port])
+        
+        # Créer les terminations A et B (Netbox 4.5+)
+        CableTermination.objects.create(
+            cable=cable,
+            cable_end='A',
+            termination=device_iface
+        )
+        CableTermination.objects.create(
+            cable=cable,
+            cable_end='B',
+            termination=switch_port
+        )
 
         messages.success(request, f'Câblage mis à jour : {device.name} vers {switch_port.device.name}/{switch_port.name}')
         return redirect('plugins:netbox_device_search:device_detail', device_id=device_id)
