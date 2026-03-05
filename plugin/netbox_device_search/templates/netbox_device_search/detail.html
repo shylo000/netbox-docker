@@ -213,8 +213,8 @@
                         <td class="ps-3"><code>{{ iface.name }}</code></td>
                         <td>{{ iface.get_type_display|default:"—" }}</td>
                         <td>
-                            {% if iface.mac_address %}
-                            <code class="text-info small">{{ iface.mac_address }}</code>
+                            {% if iface.primary_mac_address %}
+                            <code class="text-info small">{{ iface.primary_mac_address.mac_address }}</code>
                             {% else %}—{% endif %}
                         </td>
                         <td>

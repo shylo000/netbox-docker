@@ -4,8 +4,9 @@ from django.views import View
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q, Count
+from django.db import transaction
 
-from dcim.models import Device, Interface, Site, Rack, Cable, DeviceRole, DeviceType, Manufacturer
+from dcim.models import Device, Interface, Site, Rack, Cable, DeviceRole, DeviceType, Manufacturer, MACAddress
 from ipam.models import IPAddress
 
 
@@ -40,13 +41,9 @@ class DeviceSearchResultsView(View):
             devices_found = Device.objects.filter(name__icontains=name_query)
         # Recherche par MAC
         elif mac_query:
-            # Nettoyer la MAC
-            mac_clean = mac_query.replace(':', '').replace('-', '').upper()
-            interfaces = Interface.objects.filter(
-                Q(mac_address__icontains=mac_clean) | 
-                Q(mac_address__icontains=mac_query)
-            )
-            devices_found = Device.objects.filter(interfaces__in=interfaces).distinct()
+            devices_found = Device.objects.filter(
+                interfaces__mac_addresses__mac_address__icontains=mac_query
+            ).distinct()
         else:
             devices_found = Device.objects.none()
         
@@ -64,8 +61,8 @@ class DeviceSearchResultsView(View):
             ip_address = iface.ip_addresses.first().address if iface and iface.ip_addresses.exists() else None
             
             # MAC
-            mac_address = iface.mac_address if iface else None
-            
+            mac_address = iface.primary_mac_address.mac_address if iface and iface.primary_mac_address else None
+
             # Switch/port
             switch = None
             switch_port = None
@@ -107,7 +104,7 @@ class DeviceDetailView(View):
         # IP et MAC
         first_iface = interfaces.first()
         ip_address = first_iface.ip_addresses.first().address if first_iface and first_iface.ip_addresses.exists() else None
-        mac_address = first_iface.mac_address if first_iface else None
+        mac_address = first_iface.primary_mac_address.mac_address if first_iface and first_iface.primary_mac_address else None
         
         # Switch/port
         switch = None
@@ -189,54 +186,58 @@ class DeviceCreateView(View):
             return render(request, self.template_name, context)
         
         try:
-            # Créer le device
-            device = Device.objects.create(
-                name=name,
-                site_id=site_id,
-                role_id=role_id,
-                device_type_id=device_type_id,
-                rack_id=rack_id if rack_id else None,
-                serial=serial if serial else '',
-                description=description if description else '',
-                status='active',
-            )
-            
-            # Créer l'interface
-            iface = Interface.objects.create(
-                device=device,
-                name='eth0',
-                type='1000base-t',
-                mac_address=mac_address if mac_address else None,
-            )
-            
-            # Créer IP
-            if ip_address:
-                IPAddress.objects.create(
-                    address=ip_address,
-                    assigned_object=iface,
+            with transaction.atomic():
+                # Créer le device
+                device = Device.objects.create(
+                    name=name,
+                    site_id=site_id,
+                    role_id=role_id,
+                    device_type_id=device_type_id,
+                    rack_id=rack_id if rack_id else None,
+                    serial=serial if serial else '',
+                    description=description if description else '',
+                    status='active',
                 )
-            
-            # Créer câble
-            if switch_port_id:
-                switch_port = Interface.objects.get(id=switch_port_id)
-                
-                cable = Cable.objects.create(
-                    type=cable_type,
-                    label=cable_label if cable_label else f'{device.name}-{switch_port.device.name}',
-                    status='connected',
+
+                # Créer l'interface
+                iface = Interface.objects.create(
+                    device=device,
+                    name='eth0',
+                    type='1000base-t',
                 )
-                
-                cable.a_terminations.add(iface)
-                cable.b_terminations.add(switch_port)
-                
-                iface.cable = cable
-                iface.save()
-                switch_port.cable = cable
-                switch_port.save()
-            
+
+                # Créer l'adresse MAC si fournie (NetBox 4.5 : modèle séparé)
+                if mac_address:
+                    mac_obj = MACAddress.objects.create(
+                        mac_address=mac_address,
+                        assigned_object=iface,
+                    )
+                    iface.primary_mac_address = mac_obj
+                    iface.save()
+
+                # Créer IP
+                if ip_address:
+                    IPAddress.objects.create(
+                        address=ip_address,
+                        assigned_object=iface,
+                    )
+
+                # Créer câble
+                if switch_port_id:
+                    switch_port = Interface.objects.get(id=switch_port_id)
+
+                    cable = Cable(
+                        type=cable_type,
+                        label=cable_label if cable_label else f'{device.name}-{switch_port.device.name}',
+                        status='connected',
+                    )
+                    cable.a_terminations = [iface]
+                    cable.b_terminations = [switch_port]
+                    cable.save()
+
             messages.success(request, f'✅ Device {device.name} créé avec succès !')
             return redirect('plugins:netbox_device_search:device_detail', device_id=device.id)
-            
+
         except Exception as e:
             messages.error(request, f'Erreur lors de la création : {str(e)}')
             context = {
@@ -378,21 +379,14 @@ class DeviceConnectSelectPortView(View):
                 old_cable.delete()
             
             # Créer câble (Netbox 4.5)
-            cable = Cable.objects.create(
+            cable = Cable(
                 type=cable_type,
                 label=f'{device.name} - {switch.name}:{switch_port.name}',
                 status='connected',
             )
-            
-            # Ajouter terminations
-            cable.a_terminations.add(device_iface)
-            cable.b_terminations.add(switch_port)
-            
-            # Mettre à jour interfaces
-            device_iface.cable = cable
-            device_iface.save()
-            switch_port.cable = cable
-            switch_port.save()
+            cable.a_terminations = [device_iface]
+            cable.b_terminations = [switch_port]
+            cable.save()
             
             messages.success(request, 
                            f'✅ {device.name} connecté avec succès au port {switch_port.name} de {switch.name}')
@@ -463,7 +457,12 @@ class DeviceUpdatePortView(View):
         
         try:
             switch_port = Interface.objects.get(id=port_id)
-            
+
+            # Vérifier que le port switch est libre
+            if switch_port.cable:
+                messages.error(request, f'Le port {switch_port.name} sur {switch_port.device.name} est déjà occupé.')
+                return redirect('plugins:netbox_device_search:device_update_port', device_id=device_id)
+
             # Interface du device
             device_iface = device.interfaces.first()
             if not device_iface:
@@ -481,19 +480,14 @@ class DeviceUpdatePortView(View):
                 old_cable.delete()
             
             # Nouveau câble
-            cable = Cable.objects.create(
+            cable = Cable(
                 type=cable_type,
                 label=f'{device.name} - {switch_port.device.name}',
                 status='connected',
             )
-            
-            cable.a_terminations.add(device_iface)
-            cable.b_terminations.add(switch_port)
-            
-            device_iface.cable = cable
-            device_iface.save()
-            switch_port.cable = cable
-            switch_port.save()
+            cable.a_terminations = [device_iface]
+            cable.b_terminations = [switch_port]
+            cable.save()
             
             messages.success(request, f'✅ Connexion mise à jour avec succès !')
             return redirect('plugins:netbox_device_search:device_detail', device_id=device.id)
