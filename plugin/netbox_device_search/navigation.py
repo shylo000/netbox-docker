@@ -2,6 +2,11 @@ from netbox.plugins import PluginMenuItem, PluginMenuButton
 
 menu_items = (
     PluginMenuItem(
+        link='plugins:netbox_device_search:dashboard',
+        link_text='Dashboard',
+        permissions=['dcim.view_device'],
+    ),
+    PluginMenuItem(
         link='plugins:netbox_device_search:device_search',
         link_text='Recherche Périphérique',
         permissions=['dcim.view_device'],

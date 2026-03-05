@@ -2,6 +2,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Dashboard
+    path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+
     # Page principale : recherche par nom ou MAC
     path('', views.DeviceSearchView.as_view(), name='device_search'),
 
