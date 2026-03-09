@@ -118,7 +118,7 @@
                         <label class="form-label fw-bold">Type de câble</label>
                         <select class="form-select" name="cable_type">
                             {% for value, label in cable_types %}
-                            <option value="{{ value }}" {% if value=='cat6' %}selected{% endif %}>{{ label }}</option>
+                            <option value="{{ value }}" {% if value == 'cat6' %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </div>
