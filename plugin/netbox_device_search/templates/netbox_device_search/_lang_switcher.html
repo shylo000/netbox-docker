@@ -1,0 +1,96 @@
+{# ─────────────────────────────────────────────────────────────────────────── #}
+{# Partial : sélecteur de langue EN / FR                                       #}
+{# Usage : {% include 'netbox_device_search/_lang_switcher.html' %}            #}
+{# ─────────────────────────────────────────────────────────────────────────── #}
+{% load i18n %}
+
+<div class="lang-switcher-wrapper">
+    <form action="{% url 'plugins:netbox_device_search:switch_language' %}" method="post" id="lang-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.path }}">
+
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    title="{% trans 'Language' %}">
+                {% get_current_language as CURRENT_LANG %}
+                {% if CURRENT_LANG == 'fr' %}
+                    <span class="fi fi-fr"></span> FR
+                {% else %}
+                    <span class="fi fi-gb"></span> EN
+                {% endif %}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2 {% if CURRENT_LANG == 'fr' %}active{% endif %}"
+                            type="button"
+                            onclick="setLang('fr')">
+                        <span class="fi fi-fr"></span> Français
+                        {% if CURRENT_LANG == 'fr' %}<i class="mdi mdi-check ms-auto text-success"></i>{% endif %}
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2 {% if CURRENT_LANG == 'en' %}active{% endif %}"
+                            type="button"
+                            onclick="setLang('en')">
+                        <span class="fi fi-gb"></span> English
+                        {% if CURRENT_LANG == 'en' %}<i class="mdi mdi-check ms-auto text-success"></i>{% endif %}
+                    </button>
+                </li>
+            </ul>
+        </div>
+        <input type="hidden" name="language" id="lang-input" value="">
+    </form>
+</div>
+
+<script>
+    function setLang(code) {
+        document.getElementById('lang-input').value = code;
+        // Sauvegarder le choix pour ne plus auto-détecter
+        localStorage.setItem('lang_manually_set', '1');
+        document.getElementById('lang-form').submit();
+    }
+
+    // ── Détection automatique du navigateur (premier chargement uniquement) ──
+    // Si l'utilisateur n'a jamais choisi manuellement, on lit Accept-Language
+    // via navigator.language et on applique fr ou en automatiquement.
+    (function autoDetectLang() {
+        if (localStorage.getItem('lang_manually_set')) return; // choix déjà fait
+
+        {% get_current_language as CURRENT_LANG %}
+        const currentLang = '{{ CURRENT_LANG }}';
+
+        const browserLang = (navigator.language || navigator.userLanguage || 'fr').toLowerCase();
+        const detectedLang = browserLang.startsWith('fr') ? 'fr' : 'en';
+
+        if (detectedLang !== currentLang) {
+            // La langue du navigateur diffère de la langue courante → on bascule
+            document.getElementById('lang-input').value = detectedLang;
+            document.getElementById('lang-form').submit();
+        }
+    })();
+</script>
+
+<style>
+    .lang-switcher-wrapper {
+        position: absolute;
+        top: 1rem;
+        right: 1.5rem;
+        z-index: 100;
+    }
+
+    /* Flag icons via flag-icons CDN (chargé dans le template parent) */
+    .fi {
+        width: 1.2em;
+        height: 1em;
+        display: inline-block;
+        background-size: cover;
+        background-position: center;
+        border-radius: 2px;
+        vertical-align: middle;
+    }
+    .fi-fr { background-image: url('https://flagcdn.com/fr.svg'); }
+    .fi-gb { background-image: url('https://flagcdn.com/gb.svg'); }
+</style>

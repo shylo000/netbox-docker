@@ -1,13 +1,37 @@
+# On part de l'image officielle NetBox comme base
 FROM netboxcommunity/netbox:latest
 
+# Copier la liste des dépendances Python du plugin
 COPY ./plugin_requirements.txt /opt/netbox/
+
+# Installer les dépendances avec uv
 RUN /usr/local/bin/uv pip install -r /opt/netbox/plugin_requirements.txt
 
-# Copier le plugin dans site-packages où Python peut le trouver
-COPY ./plugin/netbox_device_search /opt/netbox/venv/lib/python3.12/site-packages/netbox_device_search
+# Copier le plugin dans un dossier temporaire d'abord
+# On ne hardcode PAS python3.12 — la version change selon l'image de base.
+COPY ./plugin/netbox_device_search /tmp/netbox_device_search/
 
-# Supprimer le cache Python
+# Déplacer le plugin dans le bon site-packages en détectant la version Python dynamiquement
+# python3 -c "import site; print(...)" retourne le chemin réel, quelle que soit la version
+RUN SITE_PKG=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
+    cp -r /tmp/netbox_device_search "$SITE_PKG/netbox_device_search" && \
+    rm -rf /tmp/netbox_device_search
+
+# Installer gettext (fournit msgfmt pour compiler .po → .mo sans charger Django)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gettext && \
+    rm -rf /var/lib/apt/lists/*
+
+# Compiler les traductions — même logique : chemin dynamique selon la version Python
+RUN SITE_PKG=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
+    LOCALE_DIR="$SITE_PKG/netbox_device_search/locale" && \
+    msgfmt "$LOCALE_DIR/fr/LC_MESSAGES/django.po" \
+           -o "$LOCALE_DIR/fr/LC_MESSAGES/django.mo" && \
+    msgfmt "$LOCALE_DIR/en/LC_MESSAGES/django.po" \
+           -o "$LOCALE_DIR/en/LC_MESSAGES/django.mo"
+
+# Supprimer le cache Python compilé pour forcer la relecture des fichiers
 RUN rm -rf /etc/netbox/config/__pycache__
 
-# Remplacer plugins.py par notre config
+# Remplacer la config plugins de NetBox par la nôtre
 COPY configuration/plugins.py /etc/netbox/config/plugins.py

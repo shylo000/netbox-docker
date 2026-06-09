@@ -1,7 +1,11 @@
 services:
   netbox: &netbox
-    image: docker.io/netboxcommunity/netbox:${VERSION-v4.5-4.0.0}
-    ports:              # ← CORRIGER ICI (ports avec un 's')
+    image: netbox:latest-plugins
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Dockerfile-Plugins
+    ports:
       - "8000:8080"
     depends_on:
       - postgres

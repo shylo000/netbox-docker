@@ -1,9 +1,12 @@
 {% extends 'base/layout.html' %}
+{% load i18n %}
 
-{% block title %}Résultats{% endblock %}
+{% block title %}{% trans "Search results" %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid" style="position: relative;">
+
+    {% include 'netbox_device_search/_lang_switcher.html' %}
 
     <!-- Barre de recherche en haut -->
     <div class="row mb-4">
@@ -14,14 +17,14 @@
                         <div class="input-group">
                             <span class="input-group-text"><i class="mdi mdi-tag-outline"></i></span>
                             <input type="text" class="form-control" name="name" value="{{ name_query }}"
-                                placeholder="Nom...">
+                                placeholder="{% trans 'Name...' %}">
                         </div>
                     </div>
                     <div class="col-md-5">
                         <div class="input-group">
                             <span class="input-group-text"><i class="mdi mdi-ethernet"></i></span>
                             <input type="text" class="form-control" id="mac_results_input" name="mac"
-                                value="{{ mac_query }}" placeholder="Adresse MAC..." maxlength="17">
+                                value="{{ mac_query }}" placeholder="{% trans 'MAC address...' %}" maxlength="17">
                         </div>
                         <small class="text-muted">
                             <span id="mac_results_length">0</span>/17
@@ -37,7 +40,7 @@
         </div>
         <div class="col-md-2 text-end">
             <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary w-100">
-                <i class="mdi mdi-arrow-left"></i> Retour
+                <i class="mdi mdi-arrow-left"></i> {% trans "Back" %}
             </a>
         </div>
     </div>
@@ -46,7 +49,7 @@
     {% if search_error %}
     <div class="alert alert-danger">
         <i class="mdi mdi-alert-circle"></i>
-        <strong>Erreur :</strong> {{ search_error }}
+        <strong>{% trans "Error:" %}</strong> {{ search_error }}
     </div>
     {% endif %}
 
@@ -57,17 +60,17 @@
             <div class="card border-warning shadow-sm">
                 <div class="card-body py-5">
                     <i class="mdi mdi-help-network-outline text-warning" style="font-size:4rem;"></i>
-                    <h4 class="mt-3">Aucun appareil trouvé</h4>
+                    <h4 class="mt-3">{% trans "No device found" %}</h4>
                     <p class="text-muted">
-                        Aucun périphérique ne correspond à votre recherche :
-                        {% if name_query %}<br><strong>Nom :</strong> {{ name_query }}{% endif %}
-                        {% if mac_query %}<br><strong>MAC :</strong> {{ mac_query }}{% endif %}
+                        {% trans "No device matches your search:" %}
+                        {% if name_query %}<br><strong>{% trans "Name:" %}</strong> {{ name_query }}{% endif %}
+                        {% if mac_query %}<br><strong>{% trans "MAC:" %}</strong> {{ mac_query }}{% endif %}
                     </p>
                     <hr>
-                    <p class="mb-3">Souhaitez-vous créer cet appareil ?</p>
+                    <p class="mb-3">{% trans "Do you want to create this device?" %}</p>
                     <a href="{% url 'plugins:netbox_device_search:device_create' %}?q={{ name_query|default:mac_query }}"
                         class="btn btn-success btn-lg">
-                        <i class="mdi mdi-plus-thick"></i> Créer l'appareil
+                        <i class="mdi mdi-plus-thick"></i> {% trans "Create device" %}
                     </a>
                 </div>
             </div>
@@ -78,9 +81,9 @@
     <!-- Résultats trouvés -->
     <h5 class="mb-3">
         <i class="mdi mdi-check-circle text-success"></i>
-        {{ total }} appareil{{ total|pluralize }} trouvé{{ total|pluralize }}
-        {% if name_query %}pour <strong>{{ name_query }}</strong>{% endif %}
-        {% if mac_query %}avec MAC <strong>{{ mac_query }}</strong>{% endif %}
+        {{ total }} {% trans "device(s) found" %}
+        {% if name_query %}{% trans "for" %} <strong>{{ name_query }}</strong>{% endif %}
+        {% if mac_query %}{% trans "with MAC" %} <strong>{{ mac_query }}</strong>{% endif %}
     </h5>
 
     <div class="row">
@@ -92,7 +95,7 @@
                         <i class="mdi mdi-server-network text-primary"></i>
                         {{ info.device.name }}
                     </strong>
-                    <span class="badge 
+                    <span class="badge
             {% if info.device.status == 'active' %}bg-success
             {% elif info.device.status == 'planned' %}bg-info
             {% elif info.device.status == 'failed' %}bg-danger
@@ -103,23 +106,23 @@
                 <div class="card-body">
                     <table class="table table-sm table-borderless mb-0">
                         <tr>
-                            <td class="text-muted small">Adresse IP</td>
+                            <td class="text-muted small">{% trans "IP address" %}</td>
                             <td><code>{{ info.ip_address|default:"—" }}</code></td>
                         </tr>
                         <tr>
-                            <td class="text-muted small">Adresse MAC</td>
+                            <td class="text-muted small">{% trans "MAC address" %}</td>
                             <td><code>{{ info.mac_address|default:"—" }}</code></td>
                         </tr>
                         <tr>
-                            <td class="text-muted small">Site</td>
+                            <td class="text-muted small">{% trans "Site" %}</td>
                             <td>{{ info.device.site.name|default:"—" }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted small">Rack</td>
+                            <td class="text-muted small">{% trans "Rack" %}</td>
                             <td>{{ info.rack.name|default:"—" }}</td>
                         </tr>
                         <tr>
-                            <td class="text-muted small">Switch</td>
+                            <td class="text-muted small">{% trans "Switch" %}</td>
                             <td>
                                 {% if info.switch %}
                                 <span class="badge bg-primary">{{ info.switch.name }}</span>
@@ -130,7 +133,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-muted small">N° Série</td>
+                            <td class="text-muted small">{% trans "Serial no." %}</td>
                             <td>{{ info.serial }}</td>
                         </tr>
                     </table>
@@ -138,11 +141,11 @@
                 <div class="card-footer d-flex gap-2">
                     <a href="{% url 'plugins:netbox_device_search:device_detail' info.device.id %}"
                         class="btn btn-sm btn-primary flex-grow-1">
-                        <i class="mdi mdi-eye"></i> Détail complet
+                        <i class="mdi mdi-eye"></i> {% trans "Full detail" %}
                     </a>
                     <a href="{% url 'plugins:netbox_device_search:device_update_port' info.device.id %}"
                         class="btn btn-sm btn-outline-secondary">
-                        <i class="mdi mdi-swap-horizontal"></i> Modifier port
+                        <i class="mdi mdi-swap-horizontal"></i> {% trans "Edit port" %}
                     </a>
                 </div>
             </div>
@@ -153,68 +156,47 @@
     {% else %}
     <div class="alert alert-info">
         <i class="mdi mdi-information-outline"></i>
-        Entrez un nom ou une adresse MAC pour lancer la recherche.
+        {% trans "Enter a name or MAC address to start the search." %}
     </div>
     {% endif %}
 
 </div>
 
 <script>
-    // ═══════════════════════════════════════════════════════════════════
-    // AUTO-FORMATAGE MAC DANS LA BARRE DE RECHERCHE DES RÉSULTATS
-    // ═══════════════════════════════════════════════════════════════════
     document.addEventListener('DOMContentLoaded', function () {
         const macInput = document.getElementById('mac_results_input');
         const macLengthDisplay = document.getElementById('mac_results_length');
 
         if (!macInput) return;
 
-        // Formater la valeur initiale si elle existe
-        if (macInput.value) {
-            formatMacInput(macInput);
-        }
+        if (macInput.value) formatMacInput(macInput);
 
-        macInput.addEventListener('input', function (e) {
-            formatMacInput(e.target);
-        });
+        macInput.addEventListener('input', function (e) { formatMacInput(e.target); });
 
         macInput.addEventListener('paste', function (e) {
             e.preventDefault();
             const pastedText = (e.clipboardData || window.clipboardData).getData('text');
             let cleanValue = pastedText.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-            if (cleanValue.length > 12) {
-                cleanValue = cleanValue.substring(0, 12);
-            }
+            if (cleanValue.length > 12) cleanValue = cleanValue.substring(0, 12);
 
             let formatted = '';
             for (let i = 0; i < cleanValue.length; i++) {
-                if (i > 0 && i % 2 === 0) {
-                    formatted += ':';
-                }
+                if (i > 0 && i % 2 === 0) formatted += ':';
                 formatted += cleanValue[i];
             }
-
             macInput.value = formatted;
             macInput.dispatchEvent(new Event('input'));
         });
 
         function formatMacInput(input) {
-            let value = input.value;
-            let cleanValue = value.replace(/:/g, '').toUpperCase();
-            cleanValue = cleanValue.replace(/[^0-9A-F]/g, '');
-
-            if (cleanValue.length > 12) {
-                cleanValue = cleanValue.substring(0, 12);
-            }
+            let cleanValue = input.value.replace(/:/g, '').toUpperCase().replace(/[^0-9A-F]/g, '');
+            if (cleanValue.length > 12) cleanValue = cleanValue.substring(0, 12);
 
             let formatted = '';
             for (let i = 0; i < cleanValue.length; i++) {
-                if (i > 0 && i % 2 === 0) {
-                    formatted += ':';
-                }
+                if (i > 0 && i % 2 === 0) formatted += ':';
                 formatted += cleanValue[i];
             }
-
             input.value = formatted;
             macLengthDisplay.textContent = formatted.length;
 

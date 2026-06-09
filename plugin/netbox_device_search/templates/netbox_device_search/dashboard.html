@@ -1,22 +1,25 @@
 {% extends 'base/layout.html' %}
+{% load i18n %}
 
-{% block title %}Dashboard — Parc Réseau{% endblock %}
+{% block title %}{% trans "Dashboard — Network Assets" %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div class="container-fluid" style="position: relative;">
+
+    {% include 'netbox_device_search/_lang_switcher.html' %}
 
     <!-- En-tête -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold mb-0">
             <i class="mdi mdi-view-dashboard text-primary"></i>
-            Dashboard — Vue du Parc Réseau
+            {% trans "Dashboard — Network Assets" %}
         </h2>
         <div class="d-flex gap-2">
             <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-primary">
-                <i class="mdi mdi-magnify"></i> Recherche
+                <i class="mdi mdi-magnify"></i> {% trans "Search" %}
             </a>
             <a href="{% url 'plugins:netbox_device_search:device_create' %}" class="btn btn-success">
-                <i class="mdi mdi-plus-thick"></i> Nouveau device
+                <i class="mdi mdi-plus-thick"></i> {% trans "New device" %}
             </a>
         </div>
     </div>
@@ -30,7 +33,7 @@
                     <i class="mdi mdi-server-network text-primary" style="font-size:2.5rem;"></i>
                     <div>
                         <div class="fs-2 fw-bold">{{ total_devices }}</div>
-                        <div class="text-muted small">Devices total</div>
+                        <div class="text-muted small">{% trans "Total devices" %}</div>
                     </div>
                 </div>
             </div>
@@ -42,7 +45,7 @@
                     <i class="mdi mdi-check-circle text-success" style="font-size:2.5rem;"></i>
                     <div>
                         <div class="fs-2 fw-bold text-success">{{ active_devices }}</div>
-                        <div class="text-muted small">Actifs</div>
+                        <div class="text-muted small">{% trans "Active" %}</div>
                     </div>
                 </div>
             </div>
@@ -54,7 +57,7 @@
                     <i class="mdi mdi-alert-circle text-danger" style="font-size:2.5rem;"></i>
                     <div>
                         <div class="fs-2 fw-bold text-danger">{{ devices_without_ip }}</div>
-                        <div class="text-muted small">Actifs sans IP</div>
+                        <div class="text-muted small">{% trans "Active without IP" %}</div>
                     </div>
                 </div>
             </div>
@@ -66,7 +69,7 @@
                     <i class="mdi mdi-ethernet text-info" style="font-size:2.5rem;"></i>
                     <div>
                         <div class="fs-2 fw-bold text-info">{{ total_free_ports }}</div>
-                        <div class="text-muted small">Ports libres (total)</div>
+                        <div class="text-muted small">{% trans "Free ports (total)" %}</div>
                     </div>
                 </div>
             </div>
@@ -81,17 +84,17 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header">
                     <i class="mdi mdi-map-marker-outline text-primary"></i>
-                    <strong>Ports libres par site</strong>
+                    <strong>{% trans "Free ports by site" %}</strong>
                 </div>
                 <div class="card-body p-0">
                     {% if sites_stats %}
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3">Site</th>
-                                <th class="text-center">Libres</th>
-                                <th class="text-center">Utilisés</th>
-                                <th>Occupation</th>
+                                <th class="ps-3">{% trans "Site" %}</th>
+                                <th class="text-center">{% trans "Free" %}</th>
+                                <th class="text-center">{% trans "Used" %}</th>
+                                <th>{% trans "Usage" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -120,7 +123,7 @@
                         </tbody>
                     </table>
                     {% else %}
-                    <div class="p-3 text-muted">Aucun site configuré.</div>
+                    <div class="p-3 text-muted">{% trans "No site configured." %}</div>
                     {% endif %}
                 </div>
             </div>
@@ -131,16 +134,16 @@
             <div class="card shadow-sm h-100">
                 <div class="card-header">
                     <i class="mdi mdi-cable-data text-success"></i>
-                    <strong>Dernières connexions</strong>
+                    <strong>{% trans "Recent connections" %}</strong>
                 </div>
                 <div class="card-body p-0">
                     {% if recent_cables %}
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3">Device</th>
-                                <th>Switch / Port</th>
-                                <th>Modifié</th>
+                                <th class="ps-3">{% trans "Device" %}</th>
+                                <th>{% trans "Switch / Port" %}</th>
+                                <th>{% trans "Modified" %}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -174,7 +177,7 @@
                         </tbody>
                     </table>
                     {% else %}
-                    <div class="p-3 text-muted">Aucun câble enregistré.</div>
+                    <div class="p-3 text-muted">{% trans "No cable recorded." %}</div>
                     {% endif %}
                 </div>
             </div>
@@ -185,20 +188,20 @@
             <div class="card shadow-sm">
                 <div class="card-header">
                     <i class="mdi mdi-history text-warning"></i>
-                    <strong>Devices récemment ajoutés</strong>
+                    <strong>{% trans "Recently added devices" %}</strong>
                 </div>
                 <div class="card-body p-0">
                     {% if recent_devices %}
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3">Nom</th>
-                                <th>Rôle</th>
-                                <th>Fabricant / Modèle</th>
-                                <th>Site</th>
-                                <th>Rack</th>
-                                <th>Statut</th>
-                                <th>Ajouté le</th>
+                                <th class="ps-3">{% trans "Name" %}</th>
+                                <th>{% trans "Role" %}</th>
+                                <th>{% trans "Manufacturer / Model" %}</th>
+                                <th>{% trans "Site" %}</th>
+                                <th>{% trans "Rack" %}</th>
+                                <th>{% trans "Status" %}</th>
+                                <th>{% trans "Added on" %}</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -235,7 +238,7 @@
                         </tbody>
                     </table>
                     {% else %}
-                    <div class="p-3 text-muted">Aucun device enregistré.</div>
+                    <div class="p-3 text-muted">{% trans "No device recorded." %}</div>
                     {% endif %}
                 </div>
             </div>
