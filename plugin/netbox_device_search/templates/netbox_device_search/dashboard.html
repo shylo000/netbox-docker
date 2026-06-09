@@ -4,23 +4,24 @@
 {% block title %}{% trans "Dashboard — Network Assets" %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="position: relative;">
+<div class="container-fluid">
 
-    {% include 'netbox_device_search/_lang_switcher.html' %}
-
-    <!-- En-tête -->
+    <!-- En-tête avec barre de boutons unifiée -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold mb-0">
             <i class="mdi mdi-view-dashboard text-primary"></i>
             {% trans "Dashboard — Network Assets" %}
         </h2>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
             <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-primary">
                 <i class="mdi mdi-magnify"></i> {% trans "Search" %}
             </a>
             <a href="{% url 'plugins:netbox_device_search:device_create' %}" class="btn btn-success">
                 <i class="mdi mdi-plus-thick"></i> {% trans "New device" %}
             </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
         </div>
     </div>
 
@@ -101,20 +102,15 @@
                             {% for stat in sites_stats %}
                             <tr>
                                 <td class="ps-3 fw-bold">{{ stat.site.name }}</td>
-                                <td class="text-center">
-                                    <span class="badge bg-success">{{ stat.free_ports }}</span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge bg-secondary">{{ stat.used_ports }}</span>
-                                </td>
+                                <td class="text-center"><span class="badge bg-success">{{ stat.free_ports }}</span></td>
+                                <td class="text-center"><span class="badge bg-secondary">{{ stat.used_ports }}</span></td>
                                 <td style="min-width:120px;">
                                     <div class="progress" style="height:8px;">
                                         <div class="progress-bar
                                             {% if stat.percent_used >= 90 %}bg-danger
                                             {% elif stat.percent_used >= 70 %}bg-warning
                                             {% else %}bg-success{% endif %}"
-                                            style="width:{{ stat.percent_used }}%">
-                                        </div>
+                                            style="width:{{ stat.percent_used }}%"></div>
                                     </div>
                                     <small class="text-muted">{{ stat.percent_used }}%</small>
                                 </td>
@@ -151,27 +147,17 @@
                             <tr>
                                 <td class="ps-3">
                                     {% if conn.device_a %}
-                                    <a href="{% url 'plugins:netbox_device_search:device_detail' conn.device_a.id %}">
-                                        {{ conn.device_a.name }}
-                                    </a>
+                                    <a href="{% url 'plugins:netbox_device_search:device_detail' conn.device_a.id %}">{{ conn.device_a.name }}</a>
                                     <small class="text-muted d-block">{{ conn.port_a }}</small>
-                                    {% else %}
-                                    <span class="text-muted">—</span>
-                                    {% endif %}
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
                                 </td>
                                 <td>
                                     {% if conn.device_b %}
-                                    <a href="{% url 'plugins:netbox_device_search:device_detail' conn.device_b.id %}">
-                                        {{ conn.device_b.name }}
-                                    </a>
+                                    <a href="{% url 'plugins:netbox_device_search:device_detail' conn.device_b.id %}">{{ conn.device_b.name }}</a>
                                     <small class="text-muted d-block">{{ conn.port_b }}</small>
-                                    {% else %}
-                                    <span class="text-muted">—</span>
-                                    {% endif %}
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
                                 </td>
-                                <td>
-                                    <small class="text-muted">{{ conn.cable.last_updated|date:"d/m H:i" }}</small>
-                                </td>
+                                <td><small class="text-muted">{{ conn.cable.last_updated|date:"d/m H:i" }}</small></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -228,8 +214,7 @@
                                 </td>
                                 <td><small class="text-muted">{{ dev.created|date:"d/m/Y" }}</small></td>
                                 <td>
-                                    <a href="{% url 'plugins:netbox_device_search:device_detail' dev.id %}"
-                                       class="btn btn-sm btn-outline-primary">
+                                    <a href="{% url 'plugins:netbox_device_search:device_detail' dev.id %}" class="btn btn-sm btn-outline-primary">
                                         <i class="mdi mdi-eye"></i>
                                     </a>
                                 </td>

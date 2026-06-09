@@ -4,44 +4,43 @@
 {% block title %}{% trans "Search results" %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="position: relative;">
+<div class="container-fluid">
 
-    {% include 'netbox_device_search/_lang_switcher.html' %}
-
-    <!-- Barre de recherche en haut -->
-    <div class="row mb-4">
-        <div class="col-md-10">
-            <form method="get" action="">
-                <div class="row g-2">
-                    <div class="col-md-6">
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="mdi mdi-tag-outline"></i></span>
-                            <input type="text" class="form-control" name="name" value="{{ name_query }}"
-                                placeholder="{% trans 'Name...' %}">
-                        </div>
-                    </div>
-                    <div class="col-md-5">
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="mdi mdi-ethernet"></i></span>
-                            <input type="text" class="form-control" id="mac_results_input" name="mac"
-                                value="{{ mac_query }}" placeholder="{% trans 'MAC address...' %}" maxlength="17">
-                        </div>
-                        <small class="text-muted">
-                            <span id="mac_results_length">0</span>/17
-                        </small>
-                    </div>
-                    <div class="col-md-1">
-                        <button class="btn btn-primary w-100" type="submit">
-                            <i class="mdi mdi-magnify"></i>
-                        </button>
+    <!-- Barre navigation haut — même structure que toutes les autres vues -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <!-- Barre de recherche -->
+        <form method="get" action="" class="flex-grow-1 me-3">
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="mdi mdi-tag-outline"></i></span>
+                        <input type="text" class="form-control" name="name" value="{{ name_query }}"
+                            placeholder="{% trans 'Name...' %}">
                     </div>
                 </div>
-            </form>
-        </div>
-        <div class="col-md-2 text-end">
-            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary w-100">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="mdi mdi-ethernet"></i></span>
+                        <input type="text" class="form-control" id="mac_results_input" name="mac"
+                            value="{{ mac_query }}" placeholder="{% trans 'MAC address...' %}" maxlength="17">
+                    </div>
+                    <small class="text-muted"><span id="mac_results_length">0</span>/17</small>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="mdi mdi-magnify"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+        <!-- Boutons droite + switcher langue -->
+        <div class="d-flex gap-2 align-items-center flex-shrink-0">
+            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
                 <i class="mdi mdi-arrow-left"></i> {% trans "Back" %}
             </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
         </div>
     </div>
 
@@ -53,7 +52,6 @@
     </div>
     {% endif %}
 
-    <!-- Aucun résultat -->
     {% if not_found %}
     <div class="row justify-content-center">
         <div class="col-md-6 text-center">
@@ -78,7 +76,6 @@
     </div>
 
     {% elif devices %}
-    <!-- Résultats trouvés -->
     <h5 class="mb-3">
         <i class="mdi mdi-check-circle text-success"></i>
         {{ total }} {% trans "device(s) found" %}
@@ -96,46 +93,29 @@
                         {{ info.device.name }}
                     </strong>
                     <span class="badge
-            {% if info.device.status == 'active' %}bg-success
-            {% elif info.device.status == 'planned' %}bg-info
-            {% elif info.device.status == 'failed' %}bg-danger
-            {% else %}bg-secondary{% endif %}">
+                        {% if info.device.status == 'active' %}bg-success
+                        {% elif info.device.status == 'planned' %}bg-info
+                        {% elif info.device.status == 'failed' %}bg-danger
+                        {% else %}bg-secondary{% endif %}">
                         {{ info.device.get_status_display }}
                     </span>
                 </div>
                 <div class="card-body">
                     <table class="table table-sm table-borderless mb-0">
-                        <tr>
-                            <td class="text-muted small">{% trans "IP address" %}</td>
-                            <td><code>{{ info.ip_address|default:"—" }}</code></td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted small">{% trans "MAC address" %}</td>
-                            <td><code>{{ info.mac_address|default:"—" }}</code></td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted small">{% trans "Site" %}</td>
-                            <td>{{ info.device.site.name|default:"—" }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted small">{% trans "Rack" %}</td>
-                            <td>{{ info.rack.name|default:"—" }}</td>
-                        </tr>
+                        <tr><td class="text-muted small">{% trans "IP address" %}</td><td><code>{{ info.ip_address|default:"—" }}</code></td></tr>
+                        <tr><td class="text-muted small">{% trans "MAC address" %}</td><td><code>{{ info.mac_address|default:"—" }}</code></td></tr>
+                        <tr><td class="text-muted small">{% trans "Site" %}</td><td>{{ info.device.site.name|default:"—" }}</td></tr>
+                        <tr><td class="text-muted small">{% trans "Rack" %}</td><td>{{ info.rack.name|default:"—" }}</td></tr>
                         <tr>
                             <td class="text-muted small">{% trans "Switch" %}</td>
                             <td>
                                 {% if info.switch %}
                                 <span class="badge bg-primary">{{ info.switch.name }}</span>
                                 <small class="text-muted">/ {{ info.switch_port }}</small>
-                                {% else %}
-                                <span class="text-muted">—</span>
-                                {% endif %}
+                                {% else %}<span class="text-muted">—</span>{% endif %}
                             </td>
                         </tr>
-                        <tr>
-                            <td class="text-muted small">{% trans "Serial no." %}</td>
-                            <td>{{ info.serial }}</td>
-                        </tr>
+                        <tr><td class="text-muted small">{% trans "Serial no." %}</td><td>{{ info.serial }}</td></tr>
                     </table>
                 </div>
                 <div class="card-footer d-flex gap-2">
@@ -178,7 +158,6 @@
             const pastedText = (e.clipboardData || window.clipboardData).getData('text');
             let cleanValue = pastedText.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
             if (cleanValue.length > 12) cleanValue = cleanValue.substring(0, 12);
-
             let formatted = '';
             for (let i = 0; i < cleanValue.length; i++) {
                 if (i > 0 && i % 2 === 0) formatted += ':';
@@ -191,7 +170,6 @@
         function formatMacInput(input) {
             let cleanValue = input.value.replace(/:/g, '').toUpperCase().replace(/[^0-9A-F]/g, '');
             if (cleanValue.length > 12) cleanValue = cleanValue.substring(0, 12);
-
             let formatted = '';
             for (let i = 0; i < cleanValue.length; i++) {
                 if (i > 0 && i % 2 === 0) formatted += ':';
@@ -199,7 +177,6 @@
             }
             input.value = formatted;
             macLengthDisplay.textContent = formatted.length;
-
             if (formatted.length === 17) {
                 macLengthDisplay.classList.remove('text-warning');
                 macLengthDisplay.classList.add('text-success');

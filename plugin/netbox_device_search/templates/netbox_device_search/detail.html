@@ -4,31 +4,29 @@
 {% block title %}{{ device.name }} — {% trans "Detail" %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="position: relative;">
+<div class="container-fluid">
 
-    {% include 'netbox_device_search/_lang_switcher.html' %}
-
-    <!-- En-tête -->
+    <!-- Barre navigation haut — même structure que toutes les autres vues -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold mb-0">
                 <i class="mdi mdi-server text-primary"></i>
                 {{ device.name }}
             </h2>
-            <span class="badge
-        {% if device.status == 'active' %}bg-success
-        {% elif device.status == 'planned' %}bg-info
-        {% elif device.status == 'failed' %}bg-danger
-        {% else %}bg-secondary{% endif %} mt-1">
+            <span class="badge mt-1
+                {% if device.status == 'active' %}bg-success
+                {% elif device.status == 'planned' %}bg-info
+                {% elif device.status == 'failed' %}bg-danger
+                {% else %}bg-secondary{% endif %}">
                 {{ device.get_status_display }}
             </span>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
             <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
                 <i class="mdi mdi-arrow-left"></i> {% trans "Back" %}
             </a>
             <a href="{% url 'plugins:netbox_device_search:device_connect_site' device.id %}"
-                class="btn btn-success btn-lg">
+                class="btn btn-success">
                 <i class="mdi mdi-plus-network"></i> {% trans "Connect to a switch" %}
             </a>
             <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}"
@@ -38,6 +36,9 @@
             <a href="/dcim/devices/{{ device.id }}/" class="btn btn-outline-primary" target="_blank">
                 <i class="mdi mdi-open-in-new"></i> Netbox
             </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
         </div>
     </div>
 
@@ -46,7 +47,6 @@
         <!-- Colonne gauche -->
         <div class="col-md-6">
 
-            <!-- Identité -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
                     <i class="mdi mdi-card-account-details-outline"></i>
@@ -55,36 +55,17 @@
                 <div class="card-body p-0">
                     <table class="table table-hover mb-0">
                         <tbody>
-                            <tr>
-                                <th width="40%" class="ps-3 text-muted">{% trans "Name" %}</th>
-                                <td><strong>{{ device.name }}</strong></td>
-                            </tr>
-                            <tr>
-                                <th class="ps-3 text-muted">{% trans "Description" %}</th>
-                                <td>{{ description }}</td>
-                            </tr>
-                            <tr>
-                                <th class="ps-3 text-muted">{% trans "Serial number" %}</th>
-                                <td><code>{{ serial }}</code></td>
-                            </tr>
-                            <tr>
-                                <th class="ps-3 text-muted">{% trans "Manufacturer" %}</th>
-                                <td>{{ device.device_type.manufacturer.name|default:"—" }}</td>
-                            </tr>
-                            <tr>
-                                <th class="ps-3 text-muted">{% trans "Model" %}</th>
-                                <td>{{ device.device_type.model|default:"—" }}</td>
-                            </tr>
-                            <tr>
-                                <th class="ps-3 text-muted">{% trans "Role" %}</th>
-                                <td>{{ device.role.name|default:"—" }}</td>
-                            </tr>
+                            <tr><th width="40%" class="ps-3 text-muted">{% trans "Name" %}</th><td><strong>{{ device.name }}</strong></td></tr>
+                            <tr><th class="ps-3 text-muted">{% trans "Description" %}</th><td>{{ description }}</td></tr>
+                            <tr><th class="ps-3 text-muted">{% trans "Serial number" %}</th><td><code>{{ serial }}</code></td></tr>
+                            <tr><th class="ps-3 text-muted">{% trans "Manufacturer" %}</th><td>{{ device.device_type.manufacturer.name|default:"—" }}</td></tr>
+                            <tr><th class="ps-3 text-muted">{% trans "Model" %}</th><td>{{ device.device_type.model|default:"—" }}</td></tr>
+                            <tr><th class="ps-3 text-muted">{% trans "Role" %}</th><td>{{ device.role.name|default:"—" }}</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Réseau -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-success text-white">
                     <i class="mdi mdi-ip-network-outline"></i>
@@ -96,21 +77,15 @@
                             <tr>
                                 <th width="40%" class="ps-3 text-muted">{% trans "IP address" %}</th>
                                 <td>
-                                    {% if ip_address %}
-                                    <code class="text-success">{{ ip_address }}</code>
-                                    {% else %}
-                                    <span class="text-muted">—</span>
-                                    {% endif %}
+                                    {% if ip_address %}<code class="text-success">{{ ip_address }}</code>
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
                                 </td>
                             </tr>
                             <tr>
                                 <th class="ps-3 text-muted">{% trans "MAC address" %}</th>
                                 <td>
-                                    {% if mac_address %}
-                                    <code class="text-info">{{ mac_address }}</code>
-                                    {% else %}
-                                    <span class="text-muted">—</span>
-                                    {% endif %}
+                                    {% if mac_address %}<code class="text-info">{{ mac_address }}</code>
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
                                 </td>
                             </tr>
                         </tbody>
@@ -123,7 +98,6 @@
         <!-- Colonne droite -->
         <div class="col-md-6">
 
-            <!-- Localisation -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-warning text-dark">
                     <i class="mdi mdi-map-marker-outline"></i>
@@ -139,11 +113,8 @@
                             <tr>
                                 <th class="ps-3 text-muted">{% trans "Rack" %}</th>
                                 <td>
-                                    {% if rack %}
-                                    <span class="badge bg-warning text-dark">{{ rack.name }}</span>
-                                    {% else %}
-                                    <span class="text-muted">—</span>
-                                    {% endif %}
+                                    {% if rack %}<span class="badge bg-warning text-dark">{{ rack.name }}</span>
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
                                 </td>
                             </tr>
                         </tbody>
@@ -151,7 +122,6 @@
                 </div>
             </div>
 
-            <!-- Connexion Switch -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-info text-dark">
                     <i class="mdi mdi-switch"></i>
@@ -163,21 +133,15 @@
                             <tr>
                                 <th width="40%" class="ps-3 text-muted">{% trans "Switch" %}</th>
                                 <td>
-                                    {% if switch %}
-                                    <strong class="text-primary">{{ switch.name }}</strong>
-                                    {% else %}
-                                    <span class="text-muted">{% trans "Not connected" %}</span>
-                                    {% endif %}
+                                    {% if switch %}<strong class="text-primary">{{ switch.name }}</strong>
+                                    {% else %}<span class="text-muted">{% trans "Not connected" %}</span>{% endif %}
                                 </td>
                             </tr>
                             <tr>
                                 <th class="ps-3 text-muted">{% trans "Port" %}</th>
                                 <td>
-                                    {% if switch_port %}
-                                    <code class="badge bg-info text-dark fs-6">{{ switch_port }}</code>
-                                    {% else %}
-                                    <span class="text-muted">—</span>
-                                    {% endif %}
+                                    {% if switch_port %}<code class="badge bg-info text-dark fs-6">{{ switch_port }}</code>
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
                                 </td>
                             </tr>
                         </tbody>

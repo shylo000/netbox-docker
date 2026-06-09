@@ -4,12 +4,24 @@
 {% block title %}{% trans "Device Search" %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="position: relative;">
+<div class="container-fluid">
 
-    {# ── Sélecteur de langue (coin haut-droit) ───────────────────────────── #}
-    {% include 'netbox_device_search/_lang_switcher.html' %}
+    <!-- Barre de navigation haut — cohérente avec les autres vues -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{% url 'plugins:netbox_device_search:dashboard' %}" class="btn btn-outline-secondary">
+            <i class="mdi mdi-view-dashboard"></i> Dashboard
+        </a>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{% url 'plugins:netbox_device_search:device_create' %}" class="btn btn-outline-success">
+                <i class="mdi mdi-plus-thick"></i> {% trans "Create a new device" %}
+            </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
+        </div>
+    </div>
 
-    <div class="row justify-content-center mt-5">
+    <div class="row justify-content-center">
         <div class="col-md-8">
 
             <!-- Titre -->
@@ -28,7 +40,6 @@
                 <div class="card-body p-4">
                     <form method="get" action="{% url 'plugins:netbox_device_search:device_search_results' %}">
 
-                        <!-- Recherche par nom -->
                         <div class="mb-3">
                             <label class="form-label fw-bold">
                                 <i class="mdi mdi-tag text-primary"></i> {% trans "Device name" %}
@@ -38,7 +49,6 @@
                                 value="{{ request.GET.name }}">
                         </div>
 
-                        <!-- Recherche par MAC -->
                         <div class="mb-3">
                             <label class="form-label fw-bold">
                                 <i class="mdi mdi-ethernet text-success"></i> {% trans "MAC address" %}
@@ -46,9 +56,7 @@
                             <input type="text" class="form-control form-control-lg" id="mac_search_input" name="mac"
                                 placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" value="{{ request.GET.mac }}">
                             <div class="form-text">
-                                <br>
-                                <span class="text-success">✓ {% trans 'Colons ":" will be added automatically' %}</span>
-                                <br>
+                                <span class="text-success">✓ {% trans 'Colons ":" will be added automatically' %}</span><br>
                                 <small class="text-muted">{% trans "Current length:" %} <span id="mac_search_length" class="fw-bold">0</span>/17</small>
                             </div>
                         </div>
@@ -82,13 +90,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Bouton créer -->
-            <div class="text-center mt-4">
-                <a href="{% url 'plugins:netbox_device_search:device_create' %}" class="btn btn-outline-success">
-                    <i class="mdi mdi-plus-thick"></i> {% trans "Create a new device" %}
-                </a>
             </div>
 
         </div>
@@ -131,7 +132,6 @@
             }
             input.value = formatted;
             macLengthDisplay.textContent = formatted.length;
-
             if (formatted.length === 17) {
                 macLengthDisplay.classList.remove('text-danger', 'text-warning');
                 macLengthDisplay.classList.add('text-success');

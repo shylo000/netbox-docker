@@ -4,18 +4,22 @@
 {% block title %}{% trans "Create a Device" %}{% endblock %}
 
 {% block content %}
-<div class="container-fluid" style="position: relative;">
+<div class="container-fluid">
 
-    {% include 'netbox_device_search/_lang_switcher.html' %}
-
+    <!-- Barre navigation haut — même structure que toutes les autres vues -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold mb-0">
             <i class="mdi mdi-plus-circle text-success"></i>
             {% trans "Create a New Device" %}
         </h2>
-        <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
-            <i class="mdi mdi-arrow-left"></i> {% trans "Back" %}
-        </a>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
+                <i class="mdi mdi-arrow-left"></i> {% trans "Back" %}
+            </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
+        </div>
     </div>
 
     {% if errors %}
@@ -116,8 +120,7 @@
                                 placeholder="AA:BB:CC:DD:EE:FF" maxlength="17"
                                 pattern="[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}">
                             <div class="form-text">
-                                {% trans "Format:" %} <strong>AA:BB:CC:DD:EE:FF</strong> (17 {% trans "characters exactly" %})
-                                <br>
+                                {% trans "Format:" %} <strong>AA:BB:CC:DD:EE:FF</strong> (17 {% trans "characters exactly" %})<br>
                                 <span class="text-success">✓ {% trans 'Colons ":" will be added automatically' %}</span>
                             </div>
                             <div class="mt-2">
@@ -201,7 +204,6 @@
         macInput.addEventListener('input', function (e) {
             let cleanValue = e.target.value.replace(/:/g, '').toUpperCase().replace(/[^0-9A-F]/g, '');
             if (cleanValue.length > 12) cleanValue = cleanValue.substring(0, 12);
-
             let formatted = '';
             for (let i = 0; i < cleanValue.length; i++) {
                 if (i > 0 && i % 2 === 0) formatted += ':';
@@ -209,7 +211,6 @@
             }
             e.target.value = formatted;
             macLengthDisplay.textContent = formatted.length;
-
             if (formatted.length === 17) {
                 macLengthDisplay.classList.remove('text-danger', 'text-warning');
                 macLengthDisplay.classList.add('text-success');
@@ -227,7 +228,6 @@
             const pastedText = (e.clipboardData || window.clipboardData).getData('text');
             let cleanValue = pastedText.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
             if (cleanValue.length > 12) cleanValue = cleanValue.substring(0, 12);
-
             let formatted = '';
             for (let i = 0; i < cleanValue.length; i++) {
                 if (i > 0 && i % 2 === 0) formatted += ':';
