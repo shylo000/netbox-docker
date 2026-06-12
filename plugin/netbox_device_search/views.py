@@ -1,4 +1,5 @@
 # views.py - VERSION i18n (EN/FR)
+import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 from django.contrib import messages
@@ -11,6 +12,17 @@ from django.conf import settings
 
 from dcim.models import Device, Interface, Site, Rack, Cable, DeviceRole, DeviceType, Manufacturer, MACAddress
 from ipam.models import IPAddress
+
+
+def _make_unique_slug(model_class, name, max_len=50):
+    """Génère un slug unique pour un modèle donné."""
+    base = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')[:max_len]
+    slug = base
+    counter = 1
+    while model_class.objects.filter(slug=slug).exists():
+        slug = f'{base}-{counter}'
+        counter += 1
+    return slug
 
 
 def switch_language(request):
@@ -142,6 +154,11 @@ class DeviceDetailView(View):
             'switch_port': switch_port,
             'description': device.description or '—',
             'serial': device.serial or '—',
+            # Pour le formulaire d'édition inline
+            'sites': Site.objects.all().order_by('name'),
+            'device_roles': DeviceRole.objects.all().order_by('name'),
+            'device_types': DeviceType.objects.select_related('manufacturer').all().order_by('manufacturer__name', 'model'),
+            'racks': Rack.objects.all().order_by('name'),
         }
 
         return render(request, self.template_name, context)
@@ -156,9 +173,13 @@ class DeviceCreateView(View):
             'sites': Site.objects.all().order_by('name'),
             'device_roles': DeviceRole.objects.all().order_by('name'),
             'device_types': DeviceType.objects.select_related('manufacturer').all().order_by('manufacturer__name', 'model'),
+            'manufacturers': Manufacturer.objects.all().order_by('name'),
             'racks': Rack.objects.all().order_by('name'),
             'free_ports': Interface.objects.filter(cable__isnull=True, device__role__slug__in=['switch', 'router']).select_related('device')[:100],
-            'prefill': request.GET.get('q', ''),
+            'prefill': request.GET.get('q', '') or request.GET.get('name', ''),
+            'prefill_site': request.GET.get('site', ''),
+            'prefill_role': request.GET.get('role', ''),
+            'prefill_device_type': request.GET.get('device_type', ''),
             'errors': [],
         }
         return render(request, self.template_name, context)
@@ -557,6 +578,153 @@ class DashboardView(View):
             'recent_devices': recent_devices,
         }
         return render(request, self.template_name, context)
+
+
+class DeviceEditView(View):
+    """Édition inline d'un device depuis la vue détail."""
+
+    def post(self, request, device_id):
+        device = get_object_or_404(Device, id=device_id)
+        errors = []
+
+        name           = request.POST.get('name', '').strip()
+        description    = request.POST.get('description', '').strip()
+        serial         = request.POST.get('serial', '').strip()
+        site_id        = request.POST.get('site')
+        rack_id        = request.POST.get('rack')
+        role_id        = request.POST.get('role')
+        device_type_id = request.POST.get('device_type')
+
+        if not name:
+            errors.append(str(_('Name is required')))
+        if not site_id:
+            errors.append(str(_('Site is required')))
+        if not role_id:
+            errors.append(str(_('Role is required')))
+        if not device_type_id:
+            errors.append(str(_('Device type is required')))
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+            return redirect('plugins:netbox_device_search:device_detail', device_id=device_id)
+
+        try:
+            device.name          = name
+            device.description   = description
+            device.serial        = serial
+            device.site_id       = site_id
+            device.rack_id       = rack_id if rack_id else None
+            device.role_id       = role_id
+            device.device_type_id = device_type_id
+            device.save()
+            messages.success(request, str(_('Device %(name)s updated successfully!')) % {'name': device.name})
+        except Exception as e:
+            messages.error(request, str(_('Error: %(error)s')) % {'error': str(e)})
+
+        return redirect('plugins:netbox_device_search:device_detail', device_id=device_id)
+
+
+class CheckIPConflictView(View):
+    """AJAX GET ?ip=x.x.x.x/xx — vérifie si une IP est déjà utilisée dans NetBox."""
+
+    def get(self, request):
+        ip = request.GET.get('ip', '').strip()
+        if not ip:
+            return JsonResponse({'conflict': False})
+
+        existing = IPAddress.objects.filter(address=ip).first()
+        if not existing:
+            return JsonResponse({'conflict': False})
+
+        device_name = None
+        try:
+            obj = existing.assigned_object
+            if obj and hasattr(obj, 'device'):
+                device_name = obj.device.name
+        except Exception:
+            pass
+
+        return JsonResponse({'conflict': True, 'device': device_name})
+
+
+class DeviceUpdateStatusView(View):
+    """AJAX POST — change le statut d'un device sans passer par l'admin NetBox."""
+
+    VALID_STATUSES = ['active', 'planned', 'staged', 'failed', 'inventory', 'decommissioning', 'offline']
+
+    def post(self, request, device_id):
+        device = get_object_or_404(Device, id=device_id)
+        status = request.POST.get('status', '').strip()
+
+        if status not in self.VALID_STATUSES:
+            return JsonResponse({'success': False, 'error': str(_('Invalid status'))})
+
+        device.status = status
+        device.save()
+        return JsonResponse({
+            'success': True,
+            'status': status,
+            'display': device.get_status_display(),
+        })
+
+
+class CreateDeviceRoleAjaxView(View):
+    """AJAX : Créer un DeviceRole à la volée depuis le formulaire de création."""
+
+    def post(self, request):
+        name = request.POST.get('name', '').strip()
+        color = request.POST.get('color', '9e9e9e').strip().lstrip('#')
+
+        if not name:
+            return JsonResponse({'success': False, 'error': str(_('Name is required'))})
+
+        slug = _make_unique_slug(DeviceRole, name)
+
+        try:
+            role = DeviceRole.objects.create(name=name, slug=slug, color=color)
+            return JsonResponse({'success': True, 'id': role.id, 'name': role.name})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+
+class CreateDeviceTypeAjaxView(View):
+    """AJAX : Créer un DeviceType (et éventuellement son Manufacturer) à la volée."""
+
+    def post(self, request):
+        manufacturer_id = request.POST.get('manufacturer_id', '').strip()
+        manufacturer_name = request.POST.get('manufacturer_name', '').strip()
+        model = request.POST.get('model', '').strip()
+
+        if not model:
+            return JsonResponse({'success': False, 'error': str(_('Model name is required'))})
+
+        try:
+            # Récupérer ou créer le fabricant
+            if manufacturer_id:
+                manufacturer = Manufacturer.objects.get(id=manufacturer_id)
+            elif manufacturer_name:
+                slug = _make_unique_slug(Manufacturer, manufacturer_name)
+                manufacturer, _ = Manufacturer.objects.get_or_create(
+                    name=manufacturer_name,
+                    defaults={'slug': slug},
+                )
+            else:
+                return JsonResponse({'success': False, 'error': str(_('Manufacturer is required'))})
+
+            # Créer le DeviceType
+            slug = _make_unique_slug(DeviceType, model)
+            dt = DeviceType.objects.create(manufacturer=manufacturer, model=model, slug=slug)
+
+            return JsonResponse({
+                'success': True,
+                'id': dt.id,
+                'name': f'{manufacturer.name} — {dt.model}',
+                'manufacturer_id': manufacturer.id,
+                'manufacturer_name': manufacturer.name,
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
 
 
 def get_racks_by_site(request, site_id):

@@ -44,6 +44,31 @@ urlpatterns = [
          views.get_racks_by_site,
          name='api_get_racks'),
 
+    # Édition inline d'un device
+    path('device/<int:device_id>/edit/',
+         views.DeviceEditView.as_view(),
+         name='device_edit'),
+
+    # API AJAX : Vérifier si une IP est déjà utilisée
+    path('api/check-ip/',
+         views.CheckIPConflictView.as_view(),
+         name='api_check_ip'),
+
+    # Changer le statut d'un device (AJAX POST)
+    path('device/<int:device_id>/update-status/',
+         views.DeviceUpdateStatusView.as_view(),
+         name='device_update_status'),
+
+    # API AJAX : Créer un DeviceRole à la volée
+    path('api/create-role/',
+         views.CreateDeviceRoleAjaxView.as_view(),
+         name='api_create_role'),
+
+    # API AJAX : Créer un DeviceType (+ Manufacturer si besoin) à la volée
+    path('api/create-device-type/',
+         views.CreateDeviceTypeAjaxView.as_view(),
+         name='api_create_device_type'),
+
     # Mettre à jour le port/switch d'un device (ancien système)
     path('device/<int:device_id>/update-port/',
          views.DeviceUpdatePortView.as_view(),

@@ -13,31 +13,144 @@
                 <i class="mdi mdi-server text-primary"></i>
                 {{ device.name }}
             </h2>
-            <span class="badge mt-1
-                {% if device.status == 'active' %}bg-success
-                {% elif device.status == 'planned' %}bg-info
-                {% elif device.status == 'failed' %}bg-danger
-                {% else %}bg-secondary{% endif %}">
-                {{ device.get_status_display }}
-            </span>
+            <!-- Badge statut cliquable (dropdown) -->
+            <div class="dropdown d-inline-block mt-1">
+                <button class="badge border-0 dropdown-toggle
+                    {% if device.status == 'active' %}bg-success
+                    {% elif device.status == 'planned' %}bg-info
+                    {% elif device.status == 'failed' %}bg-danger
+                    {% else %}bg-secondary{% endif %}"
+                    id="statusDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+                    style="cursor:pointer; font-size:.8rem;">
+                    <i class="mdi mdi-pencil-outline"></i>
+                    <span id="status_label">{{ device.get_status_display }}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-start shadow" aria-labelledby="statusDropdown">
+                    <li><h6 class="dropdown-header">{% trans "Change status" %}</h6></li>
+                    <li><button class="dropdown-item" onclick="updateStatus('active')"><span class="badge bg-success me-2">●</span>Active</button></li>
+                    <li><button class="dropdown-item" onclick="updateStatus('planned')"><span class="badge bg-info me-2">●</span>Planned</button></li>
+                    <li><button class="dropdown-item" onclick="updateStatus('staged')"><span class="badge bg-primary me-2">●</span>Staged</button></li>
+                    <li><button class="dropdown-item" onclick="updateStatus('failed')"><span class="badge bg-danger me-2">●</span>Failed</button></li>
+                    <li><button class="dropdown-item" onclick="updateStatus('offline')"><span class="badge bg-secondary me-2">●</span>Offline</button></li>
+                    <li><button class="dropdown-item" onclick="updateStatus('decommissioning')"><span class="badge bg-warning me-2">●</span>Decommissioning</button></li>
+                </ul>
+            </div>
+            <span id="status_feedback" class="ms-2 small text-success d-none">✓ {% trans "Saved" %}</span>
         </div>
         <div class="d-flex gap-2 align-items-center">
             <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-secondary">
                 <i class="mdi mdi-arrow-left"></i> {% trans "Back" %}
             </a>
+            <a href="{% url 'plugins:netbox_device_search:device_create' %}?name=Copy of {{ device.name }}&site={{ device.site.id }}&role={{ device.role.id }}&device_type={{ device.device_type.id }}"
+                class="btn btn-outline-warning">
+                <i class="mdi mdi-content-copy"></i> {% trans "Duplicate" %}
+            </a>
             <a href="{% url 'plugins:netbox_device_search:device_connect_site' device.id %}"
                 class="btn btn-success">
                 <i class="mdi mdi-plus-network"></i> {% trans "Connect to a switch" %}
             </a>
-            <a href="{% url 'plugins:netbox_device_search:device_update_port' device.id %}"
-                class="btn btn-outline-primary">
-                <i class="mdi mdi-swap-horizontal"></i> {% trans "Edit (legacy)" %}
-            </a>
+            <button class="btn btn-outline-warning" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#editPanel" aria-expanded="false">
+                <i class="mdi mdi-pencil-outline"></i> {% trans "Edit" %}
+            </button>
             <a href="/dcim/devices/{{ device.id }}/" class="btn btn-outline-primary" target="_blank">
                 <i class="mdi mdi-open-in-new"></i> Netbox
             </a>
             <div class="border-start border-secondary ps-2 ms-1">
                 {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PANNEAU D'ÉDITION (collapsible)
+    ══════════════════════════════════════════════════════════ -->
+    <div class="collapse mb-4" id="editPanel">
+        <div class="card shadow border-warning">
+            <div class="card-header bg-warning text-dark fw-bold">
+                <i class="mdi mdi-pencil-outline"></i> {% trans "Edit device" %} — {{ device.name }}
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'plugins:netbox_device_search:device_edit' device.id %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+
+                        <!-- Colonne gauche -->
+                        <div class="col-md-6">
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{% trans "Device name" %} <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="name" value="{{ device.name }}" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{% trans "Description" %}</label>
+                                <textarea class="form-control" name="description" rows="2">{{ device.description }}</textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{% trans "Serial number" %}</label>
+                                <input type="text" class="form-control" name="serial" value="{{ device.serial }}">
+                            </div>
+
+                        </div>
+
+                        <!-- Colonne droite -->
+                        <div class="col-md-6">
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{% trans "Site" %} <span class="text-danger">*</span></label>
+                                <select class="form-select" name="site" required>
+                                    <option value="">—</option>
+                                    {% for site in sites %}
+                                    <option value="{{ site.id }}" {% if site.id == device.site.id %}selected{% endif %}>{{ site.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{% trans "Rack" %}</label>
+                                <select class="form-select" name="rack">
+                                    <option value="">— {% trans "No rack" %} —</option>
+                                    {% for rack in racks %}
+                                    <option value="{{ rack.id }}" {% if device.rack and rack.id == device.rack.id %}selected{% endif %}>{{ rack.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{% trans "Role" %} <span class="text-danger">*</span></label>
+                                <select class="form-select" name="role" required>
+                                    <option value="">—</option>
+                                    {% for role in device_roles %}
+                                    <option value="{{ role.id }}" {% if role.id == device.role.id %}selected{% endif %}>{{ role.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{% trans "Type / Model" %} <span class="text-danger">*</span></label>
+                                <select class="form-select" name="device_type" required>
+                                    <option value="">—</option>
+                                    {% for dt in device_types %}
+                                    <option value="{{ dt.id }}" {% if dt.id == device.device_type.id %}selected{% endif %}>{{ dt.manufacturer.name }} — {{ dt.model }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-2">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="mdi mdi-content-save-outline"></i> {% trans "Save changes" %}
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary"
+                                data-bs-toggle="collapse" data-bs-target="#editPanel">
+                            {% trans "Cancel" %}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -200,4 +313,46 @@
     {% endif %}
 
 </div>
+
+<script>
+const STATUS_COLORS = {
+    active: 'bg-success',
+    planned: 'bg-info',
+    staged: 'bg-primary',
+    failed: 'bg-danger',
+    offline: 'bg-secondary',
+    decommissioning: 'bg-warning',
+    inventory: 'bg-secondary',
+};
+
+async function updateStatus(newStatus) {
+    const btn = document.getElementById('statusDropdown');
+    const label = document.getElementById('status_label');
+    const feedback = document.getElementById('status_feedback');
+
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    fd.append('status', newStatus);
+
+    try {
+        const resp = await fetch("{% url 'plugins:netbox_device_search:device_update_status' device.id %}", {
+            method: 'POST', body: fd
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            // Mettre à jour le badge visuellement
+            Object.values(STATUS_COLORS).forEach(c => btn.classList.remove(c));
+            btn.classList.add(STATUS_COLORS[data.status] || 'bg-secondary');
+            label.textContent = data.display;
+
+            // Flash confirmation
+            feedback.classList.remove('d-none');
+            setTimeout(() => feedback.classList.add('d-none'), 2000);
+        }
+    } catch (e) {
+        console.error('Erreur mise à jour statut :', e);
+    }
+}
+</script>
 {% endblock %}

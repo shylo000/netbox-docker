@@ -1,4 +1,4 @@
-{% extends 'base/layout.html' %}
+        {% extends 'base/layout.html' %}
 {% load i18n %}
 
 {% block title %}{% trans "Create a Device" %}{% endblock %}
@@ -55,29 +55,43 @@
                             <select class="form-select" name="site" required>
                                 <option value="">— {% trans "Select a site" %} —</option>
                                 {% for site in sites %}
-                                <option value="{{ site.id }}">{{ site.name }}</option>
+                                <option value="{{ site.id }}" {% if site.id|stringformat:"s" == prefill_site %}selected{% endif %}>{{ site.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">{% trans "Role" %} <span class="text-danger">*</span></label>
-                            <select class="form-select" name="role" required>
-                                <option value="">— {% trans "Select a role" %} —</option>
-                                {% for role in device_roles %}
-                                <option value="{{ role.id }}">{{ role.name }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="d-flex gap-2">
+                                <select class="form-select" name="role" id="role_select" required>
+                                    <option value="">— {% trans "Select a role" %} —</option>
+                                    {% for role in device_roles %}
+                                    <option value="{{ role.id }}" {% if role.id|stringformat:"s" == prefill_role %}selected{% endif %}>{{ role.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-outline-success btn-sm text-nowrap"
+                                        data-bs-toggle="modal" data-bs-target="#modalCreateRole"
+                                        title="{% trans 'Create a new role' %}">
+                                    <i class="mdi mdi-plus"></i> {% trans "New" %}
+                                </button>
+                            </div>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">{% trans "Type / Model" %} <span class="text-danger">*</span></label>
-                            <select class="form-select" name="device_type" required>
-                                <option value="">— {% trans "Select a type" %} —</option>
-                                {% for dt in device_types %}
-                                <option value="{{ dt.id }}">{{ dt.manufacturer.name }} — {{ dt.model }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="d-flex gap-2">
+                                <select class="form-select" name="device_type" id="device_type_select" required>
+                                    <option value="">— {% trans "Select a type" %} —</option>
+                                    {% for dt in device_types %}
+                                    <option value="{{ dt.id }}" {% if dt.id|stringformat:"s" == prefill_device_type %}selected{% endif %}>{{ dt.manufacturer.name }} — {{ dt.model }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-outline-success btn-sm text-nowrap"
+                                        data-bs-toggle="modal" data-bs-target="#modalCreateDeviceType"
+                                        title="{% trans 'Create a new device type' %}">
+                                    <i class="mdi mdi-plus"></i> {% trans "New" %}
+                                </button>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -130,9 +144,14 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">{% trans "IP address" %}</label>
-                            <input type="text" class="form-control" name="ip_address"
-                                placeholder="{% trans 'e.g. 192.168.1.100/24' %}">
+                            <input type="text" class="form-control" name="ip_address" id="ip_address_input"
+                                placeholder="{% trans 'e.g. 192.168.1.100/24' %}"
+                                pattern="^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$">
                             <div class="form-text">{% trans "Format: x.x.x.x/mask" %}</div>
+                            <div id="ip_conflict_warning" class="alert alert-warning py-1 px-2 mt-2 d-none small">
+                                <i class="mdi mdi-alert-outline"></i>
+                                <span id="ip_conflict_msg"></span>
+                            </div>
                         </div>
 
                     </div>
@@ -194,6 +213,96 @@
     </form>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     MODAL — Créer un DeviceRole
+════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalCreateRole" tabindex="-1" aria-labelledby="modalCreateRoleLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalCreateRoleLabel">
+                    <i class="mdi mdi-tag-plus-outline"></i> {% trans "Create a new Device Role" %}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="role_modal_error" class="alert alert-danger d-none"></div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{% trans "Role name" %} <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="new_role_name" placeholder="{% trans 'e.g. Switch, Router, Server...' %}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{% trans "Color" %}</label>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="color" class="form-control form-control-color" id="new_role_color" value="#9e9e9e" style="width:60px;">
+                        <span class="text-muted">{% trans "Default: gray" %}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button type="button" class="btn btn-success" id="btn_create_role">
+                    <i class="mdi mdi-check"></i> {% trans "Create role" %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     MODAL — Créer un DeviceType
+════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalCreateDeviceType" tabindex="-1" aria-labelledby="modalCreateDeviceTypeLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalCreateDeviceTypeLabel">
+                    <i class="mdi mdi-chip"></i> {% trans "Create a new Device Type" %}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="dt_modal_error" class="alert alert-danger d-none"></div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{% trans "Manufacturer" %} <span class="text-danger">*</span></label>
+                    <select class="form-select" id="new_dt_manufacturer_id">
+                        <option value="">— {% trans "Select existing" %} —</option>
+                        {% for m in manufacturers %}
+                        <option value="{{ m.id }}">{{ m.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-2">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="new_manufacturer_toggle">
+                        <label class="form-check-label" for="new_manufacturer_toggle">
+                            {% trans "Create a new manufacturer instead" %}
+                        </label>
+                    </div>
+                </div>
+
+                <div id="new_manufacturer_field" class="mb-3 d-none">
+                    <label class="form-label fw-bold">{% trans "New manufacturer name" %} <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="new_dt_manufacturer_name" placeholder="{% trans 'e.g. Cisco, HP, Ubiquiti...' %}">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{% trans "Model name" %} <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="new_dt_model" placeholder="{% trans 'e.g. Catalyst 2960, ProCurve 2530...' %}">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button type="button" class="btn btn-success" id="btn_create_device_type">
+                    <i class="mdi mdi-check"></i> {% trans "Create type" %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const macInput = document.getElementById('mac_address_input');
@@ -236,6 +345,190 @@
             macInput.value = formatted;
             macInput.dispatchEvent(new Event('input'));
         });
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    // Vérification conflit IP (appel AJAX au blur du champ)
+    // ─────────────────────────────────────────────────────────────────
+    const ipConflictWarning = document.getElementById('ip_conflict_warning');
+    const ipConflictMsg = document.getElementById('ip_conflict_msg');
+
+    if (ipInput) {
+        ipInput.addEventListener('blur', async function () {
+            const val = this.value.trim();
+            if (!val) { ipConflictWarning.classList.add('d-none'); return; }
+
+            try {
+                const resp = await fetch("{% url 'plugins:netbox_device_search:api_check_ip' %}?ip=" + encodeURIComponent(val));
+                const data = await resp.json();
+                if (data.conflict) {
+                    const who = data.device ? ` ({% trans "used by" %} ${data.device})` : '';
+                    ipConflictMsg.textContent = `{% trans "Warning: this IP is already used in NetBox" %}${who}`;
+                    ipConflictWarning.classList.remove('d-none');
+                } else {
+                    ipConflictWarning.classList.add('d-none');
+                }
+            } catch (e) { /* silencieux si le réseau est indispo */ }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // IP address : autoriser uniquement chiffres, points et slash
+    // ─────────────────────────────────────────────────────────────────
+    const ipInput = document.getElementById('ip_address_input');
+    if (ipInput) {
+        ipInput.addEventListener('keydown', function (e) {
+            // Autoriser : chiffres, . / et touches de contrôle
+            const allowed = /^[0-9./]$/;
+            const control = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
+            if (!allowed.test(e.key) && !control.includes(e.key) && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+            }
+        });
+        ipInput.addEventListener('paste', function (e) {
+            e.preventDefault();
+            const pasted = (e.clipboardData || window.clipboardData).getData('text');
+            const clean = pasted.replace(/[^0-9./]/g, '');
+            document.execCommand('insertText', false, clean);
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Helper : poster un FormData en AJAX et retourner la réponse JSON
+    // ─────────────────────────────────────────────────────────────────
+    function getCsrf() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    async function postAjax(url, data) {
+        const fd = new FormData();
+        fd.append('csrfmiddlewaretoken', getCsrf());
+        for (const [k, v] of Object.entries(data)) fd.append(k, v);
+        const resp = await fetch(url, { method: 'POST', body: fd });
+        return resp.json();
+    }
+
+    function showModalError(elId, msg) {
+        const el = document.getElementById(elId);
+        el.textContent = msg;
+        el.classList.remove('d-none');
+    }
+    function hideModalError(elId) {
+        document.getElementById(elId).classList.add('d-none');
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // MODAL : Créer un DeviceRole
+    // ─────────────────────────────────────────────────────────────────
+    document.getElementById('modalCreateRole').addEventListener('show.bs.modal', function () {
+        document.getElementById('new_role_name').value = '';
+        document.getElementById('new_role_color').value = '#9e9e9e';
+        hideModalError('role_modal_error');
+    });
+
+    document.getElementById('btn_create_role').addEventListener('click', async function () {
+        hideModalError('role_modal_error');
+        const name = document.getElementById('new_role_name').value.trim();
+        const color = document.getElementById('new_role_color').value.replace('#', '');
+
+        if (!name) {
+            showModalError('role_modal_error', '{% trans "Name is required" %}');
+            return;
+        }
+
+        this.disabled = true;
+        try {
+            const data = await postAjax("{% url 'plugins:netbox_device_search:api_create_role' %}", { name, color });
+            if (data.success) {
+                // Ajouter l'option dans le select et la sélectionner
+                const select = document.getElementById('role_select');
+                const opt = new Option(data.name, data.id, true, true);
+                select.appendChild(opt);
+                bootstrap.Modal.getInstance(document.getElementById('modalCreateRole')).hide();
+            } else {
+                showModalError('role_modal_error', data.error);
+            }
+        } catch (e) {
+            showModalError('role_modal_error', 'Erreur réseau : ' + e.message);
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    // MODAL : Créer un DeviceType
+    // ─────────────────────────────────────────────────────────────────
+    document.getElementById('new_manufacturer_toggle').addEventListener('change', function () {
+        const newField = document.getElementById('new_manufacturer_field');
+        const selectField = document.getElementById('new_dt_manufacturer_id');
+        if (this.checked) {
+            newField.classList.remove('d-none');
+            selectField.disabled = true;
+        } else {
+            newField.classList.add('d-none');
+            selectField.disabled = false;
+        }
+    });
+
+    document.getElementById('modalCreateDeviceType').addEventListener('show.bs.modal', function () {
+        document.getElementById('new_dt_model').value = '';
+        document.getElementById('new_dt_manufacturer_name').value = '';
+        document.getElementById('new_dt_manufacturer_id').value = '';
+        document.getElementById('new_manufacturer_toggle').checked = false;
+        document.getElementById('new_manufacturer_field').classList.add('d-none');
+        document.getElementById('new_dt_manufacturer_id').disabled = false;
+        hideModalError('dt_modal_error');
+    });
+
+    document.getElementById('btn_create_device_type').addEventListener('click', async function () {
+        hideModalError('dt_modal_error');
+        const model = document.getElementById('new_dt_model').value.trim();
+        const useNewManufacturer = document.getElementById('new_manufacturer_toggle').checked;
+        const manufacturerId = document.getElementById('new_dt_manufacturer_id').value;
+        const manufacturerName = document.getElementById('new_dt_manufacturer_name').value.trim();
+
+        if (!model) {
+            showModalError('dt_modal_error', '{% trans "Model name is required" %}');
+            return;
+        }
+        if (useNewManufacturer && !manufacturerName) {
+            showModalError('dt_modal_error', '{% trans "Manufacturer name is required" %}');
+            return;
+        }
+        if (!useNewManufacturer && !manufacturerId) {
+            showModalError('dt_modal_error', '{% trans "Please select or create a manufacturer" %}');
+            return;
+        }
+
+        const payload = { model };
+        if (useNewManufacturer) payload.manufacturer_name = manufacturerName;
+        else payload.manufacturer_id = manufacturerId;
+
+        this.disabled = true;
+        try {
+            const data = await postAjax("{% url 'plugins:netbox_device_search:api_create_device_type' %}", payload);
+            if (data.success) {
+                // Ajouter dans le select DeviceType et sélectionner
+                const select = document.getElementById('device_type_select');
+                const opt = new Option(data.name, data.id, true, true);
+                select.appendChild(opt);
+
+                // Si nouveau fabricant créé, l'ajouter au select du modal aussi
+                if (data.manufacturer_id && useNewManufacturer) {
+                    const mSelect = document.getElementById('new_dt_manufacturer_id');
+                    const mOpt = new Option(data.manufacturer_name, data.manufacturer_id);
+                    mSelect.appendChild(mOpt);
+                }
+
+                bootstrap.Modal.getInstance(document.getElementById('modalCreateDeviceType')).hide();
+            } else {
+                showModalError('dt_modal_error', data.error);
+            }
+        } catch (e) {
+            showModalError('dt_modal_error', 'Erreur réseau : ' + e.message);
+        } finally {
+            this.disabled = false;
+        }
     });
 </script>
 {% endblock %}
