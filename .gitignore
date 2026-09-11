@@ -21,3 +21,4 @@ plugin/netbox_device_search/static/netbox_device_search/img/*.jpg
 plugin/netbox_device_search/static/netbox_device_search/img/*.png
 plugin/netbox_device_search/static/netbox_device_search/img/plan_usine.png
 plugin/netbox_device_search/static/netbox_device_search/img/
+plugin/netbox_device_search.backup.*/

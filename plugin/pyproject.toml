@@ -1,0 +1,51 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Netlink — netbox_device_search
+#  À placer À CÔTÉ du dossier netbox_device_search/, jamais dedans :
+#
+#      netlink/
+#      ├── pyproject.toml        <- ce fichier
+#      └── netbox_device_search/
+#          ├── __init__.py
+#          └── ...
+#
+#  Installation sur la VM :
+#      sudo /opt/netbox/venv/bin/pip install /chemin/vers/netlink/
+# ─────────────────────────────────────────────────────────────────────────────
+
+[build-system]
+requires      = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "netbox-device-search"
+version         = "1.2.0"
+description     = "Netlink — recherche, creation et cablage d'equipements reseau pour NetBox"
+requires-python = ">=3.10"
+authors         = [{ name = "Jonathan Agneray" }]
+
+# Aucune dependance externe : tout vient de NetBox lui-meme (dcim, ipam,
+# core, extras) et de Django. Ne rien mettre ici evite que pip tente de
+# reinstaller Django dans le venv de production.
+dependencies = []
+
+[project.urls]
+Source = "https://github.com/JonathanCybSec/netbox-docker"
+
+[tool.setuptools.packages.find]
+include = ["netbox_device_search*"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  SANS ce bloc, pip n'embarque QUE les fichiers .py.
+#  Le plugin se charge sans erreur, le menu apparait... et chaque page
+#  renvoie TemplateDoesNotExist. C'est le piege n°1 du packaging d'un
+#  plugin NetBox : le Dockerfile faisait un COPY brut du dossier entier,
+#  pip, lui, ne copie que ce qu'on lui declare.
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.setuptools.package-data]
+netbox_device_search = [
+    "templates/netbox_device_search/*.html",
+    "templates/netbox_device_search/*/*.html",
+    "static/netbox_device_search/*",
+    "static/netbox_device_search/*/*",
+    "locale/*/LC_MESSAGES/*.mo",
+]
