@@ -1,0 +1,67 @@
+{% extends 'base/layout.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Sites & racks" %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">
+            <i class="mdi mdi-sitemap text-primary"></i>
+            {% trans "Sites & racks" %}
+        </h2>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{% url 'plugins:netbox_device_search:dashboard' %}" class="btn btn-outline-secondary">
+                <i class="mdi mdi-view-dashboard"></i> {% trans "Dashboard" %}
+            </a>
+            <a href="{% url 'plugins:netbox_device_search:device_search' %}" class="btn btn-outline-primary">
+                <i class="mdi mdi-magnify"></i> {% trans "Search" %}
+            </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
+        </div>
+    </div>
+
+    <p class="text-muted">
+        {% trans "Browse your infrastructure: site → datacenter → rack → device." %}
+    </p>
+
+    <!-- Grille des sites -->
+    <div class="row g-4">
+        {% for site in sites %}
+        <div class="col-md-4">
+            <a href="{% url 'plugins:netbox_device_search:site_detail' site.id %}"
+               class="card shadow-sm h-100 text-decoration-none text-reset border-start border-primary border-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-3">
+                        <i class="mdi mdi-map-marker text-primary"></i> {{ site.name }}
+                    </h5>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted small">
+                            <i class="mdi mdi-office-building-outline"></i> {% trans "Datacenters" %}
+                        </span>
+                        <span class="badge bg-secondary">{{ site.location_count }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted small"><i class="mdi mdi-server"></i> {% trans "Racks" %}</span>
+                        <span class="badge bg-info">{{ site.rack_count }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="text-muted small"><i class="mdi mdi-network"></i> {% trans "Devices" %}</span>
+                        <span class="badge bg-success">{{ site.device_count }}</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info">{% trans "No site configured." %}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

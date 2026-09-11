@@ -1,0 +1,267 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Connecter {{ device.name }} — Sélection Site{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="mdi mdi-cable-data text-primary"></i>
+                Connexion de <span class="text-primary">{{ device.name }}</span>
+            </h2>
+            <p class="text-muted mb-0">
+                <span class="badge bg-primary">Étape 1/3</span> 
+                Sélection du site et de la baie
+            </p>
+        </div>
+        <a href="{% url 'plugins:netbox_device_search:device_detail' device.id %}" class="btn btn-outline-secondary">
+            <i class="mdi mdi-close"></i> Annuler
+        </a>
+    </div>
+
+    <!-- Progression -->
+    <div class="mb-5">
+        <div class="row text-center">
+            <div class="col-md-4">
+                <div class="card border-primary shadow-sm">
+                    <div class="card-body py-3">
+                        <i class="mdi mdi-map-marker fs-3 text-primary"></i>
+                        <p class="mb-0 mt-2 fw-bold">1. Site & Baie</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-secondary">
+                    <div class="card-body py-3">
+                        <i class="mdi mdi-server fs-3 text-muted"></i>
+                        <p class="mb-0 mt-2 text-muted">2. Switch</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-secondary">
+                    <div class="card-body py-3">
+                        <i class="mdi mdi-ethernet fs-3 text-muted"></i>
+                        <p class="mb-0 mt-2 text-muted">3. Port</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sélection du Site -->
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-8">
+            <div class="card shadow-lg border-primary">
+                <div class="card-header bg-primary text-white py-3">
+                    <i class="mdi mdi-map-marker"></i> 
+                    <strong>Sélectionnez le site où se trouve le switch</strong>
+                </div>
+                <div class="card-body p-4">
+                    <label class="form-label fw-bold fs-5 mb-3">
+                        📍 Site <span class="text-danger">*</span>
+                    </label>
+                    <select class="form-select form-select-lg" id="site_select">
+                        <option value="">— Choisissez un site —</option>
+                        {% for site in sites %}
+                        <option value="{{ site.id }}">{{ site.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text mt-2">
+                        Les baies disponibles dans ce site apparaîtront ci-dessous
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loader (pendant le chargement AJAX) -->
+    <div id="loading_indicator" class="text-center mb-4" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+        <p class="text-muted mt-2">Chargement des baies...</p>
+    </div>
+
+    <!-- Message si aucune baie -->
+    <div id="no_racks_message" class="alert alert-warning" style="display: none;">
+        <i class="mdi mdi-alert-outline"></i>
+        <strong>Aucune baie disponible</strong> dans ce site.
+    </div>
+
+    <!-- Conteneur des Baies (apparaît avec transition) -->
+    <div id="racks_container" style="display: none;">
+        <h4 class="mb-4">
+            <i class="mdi mdi-server-network"></i> 
+            Baies disponibles dans <span id="site_name_display" class="text-primary"></span>
+        </h4>
+        <div class="row g-4" id="racks_grid">
+            <!-- Les cards des baies seront insérées ici par JavaScript -->
+        </div>
+    </div>
+
+</div>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════ */
+/* TRANSITIONS CSS - Fade + Slide Up                               */
+/* ═══════════════════════════════════════════════════════════════ */
+
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.rack-card {
+    animation: fadeSlideUp 0.5s ease-out forwards;
+    opacity: 0;
+}
+
+/* Délai progressif pour chaque card (effet cascade) */
+.rack-card:nth-child(1) { animation-delay: 0.1s; }
+.rack-card:nth-child(2) { animation-delay: 0.2s; }
+.rack-card:nth-child(3) { animation-delay: 0.3s; }
+.rack-card:nth-child(4) { animation-delay: 0.4s; }
+.rack-card:nth-child(5) { animation-delay: 0.5s; }
+.rack-card:nth-child(6) { animation-delay: 0.6s; }
+.rack-card:nth-child(7) { animation-delay: 0.7s; }
+.rack-card:nth-child(8) { animation-delay: 0.8s; }
+
+/* Hover effect */
+.rack-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.rack-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.rack-icon {
+    font-size: 3rem;
+    transition: transform 0.3s ease;
+}
+
+.rack-card:hover .rack-icon {
+    transform: scale(1.1) rotate(5deg);
+}
+</style>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CHARGEMENT DYNAMIQUE DES BAIES AVEC TRANSITION
+// ═══════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', function() {
+    const siteSelect = document.getElementById('site_select');
+    const racksContainer = document.getElementById('racks_container');
+    const racksGrid = document.getElementById('racks_grid');
+    const loadingIndicator = document.getElementById('loading_indicator');
+    const noRacksMessage = document.getElementById('no_racks_message');
+    const siteNameDisplay = document.getElementById('site_name_display');
+    
+    // Quand on change de site
+    siteSelect.addEventListener('change', function() {
+        const siteId = this.value;
+        
+        // Cacher tout
+        racksContainer.style.display = 'none';
+        noRacksMessage.style.display = 'none';
+        racksGrid.innerHTML = '';
+        
+        if (!siteId) {
+            return;
+        }
+        
+        // Afficher le loader
+        loadingIndicator.style.display = 'block';
+        
+        // Appel AJAX pour récupérer les baies
+        fetch(`/plugins/device-search/api/racks/${siteId}/`)
+            .then(response => response.json())
+            .then(data => {
+                // Cacher le loader
+                loadingIndicator.style.display = 'none';
+                
+                if (data.success && data.racks.length > 0) {
+                    // Afficher le nom du site
+                    siteNameDisplay.textContent = data.site_name;
+                    
+                    // Créer les cards des baies
+                    data.racks.forEach((rack, index) => {
+                        const card = createRackCard(rack, {{ device.id }});
+                        racksGrid.appendChild(card);
+                    });
+                    
+                    // Afficher le conteneur avec transition
+                    racksContainer.style.display = 'block';
+                    
+                } else if (data.success && data.racks.length === 0) {
+                    // Aucune baie trouvée
+                    noRacksMessage.style.display = 'block';
+                    
+                } else {
+                    alert('Erreur lors du chargement des baies : ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(error => {
+                loadingIndicator.style.display = 'none';
+                alert('Erreur réseau : ' + error);
+            });
+    });
+    
+    // Fonction pour créer une card de baie
+    function createRackCard(rack, deviceId) {
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4 col-xl-3';
+        
+        col.innerHTML = `
+            <div class="card rack-card shadow-sm border-0 h-100">
+                <div class="card-body text-center p-4">
+                    <div class="rack-icon mb-3">
+                        <i class="mdi mdi-server-network text-primary"></i>
+                    </div>
+                    <h5 class="card-title fw-bold mb-2">${rack.name}</h5>
+                    <div class="mb-3">
+                        <span class="badge bg-primary">${rack.device_count} équipements</span>
+                        ${rack.switches_with_free_ports > 0 ? 
+                            `<span class="badge bg-success">${rack.switches_with_free_ports} switches libres</span>` 
+                            : 
+                            `<span class="badge bg-secondary">Aucun port libre</span>`
+                        }
+                    </div>
+                    ${rack.description ? 
+                        `<p class="text-muted small mb-3">${rack.description}</p>` 
+                        : ''
+                    }
+                    ${rack.switches_with_free_ports > 0 ? 
+                        `<a href="/plugins/device-search/device/${deviceId}/connect/switch/${rack.id}/" 
+                           class="btn btn-primary w-100">
+                            <i class="mdi mdi-arrow-right"></i> Voir les switches
+                        </a>` 
+                        : 
+                        `<button class="btn btn-secondary w-100" disabled>
+                            Aucun port disponible
+                        </button>`
+                    }
+                </div>
+            </div>
+        `;
+        
+        return col;
+    }
+});
+</script>
+
+{% endblock %}

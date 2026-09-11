@@ -12,3 +12,12 @@ __pycache__/
 
 # NetBox runtime
 .netbox
+
+# Sauvegardes de la refacto — Git fait déjà ce travail
+plugin/netbox_device_search.backup.*/
+
+# Plan de masse de l'usine : donnée sensible, livrée par volume monté
+plugin/netbox_device_search/static/netbox_device_search/img/*.jpg
+plugin/netbox_device_search/static/netbox_device_search/img/*.png
+plugin/netbox_device_search/static/netbox_device_search/img/plan_usine.png
+plugin/netbox_device_search/static/netbox_device_search/img/

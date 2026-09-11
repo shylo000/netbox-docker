@@ -8,5 +8,6 @@ services:
       context: .
       dockerfile: Dockerfile-Plugins
   netbox-worker:
+    ports: []   # le worker hérite de 8000:8080 via l'ancre YAML : on le neutralise
     image: netbox:latest-plugins
     pull_policy: never

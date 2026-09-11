@@ -17,10 +17,18 @@ RUN SITE_PKG=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
     cp -r /tmp/netbox_device_search "$SITE_PKG/netbox_device_search" && \
     rm -rf /tmp/netbox_device_search
 
-# Compiler les traductions .po -> .mo avec polib (ni apt ni gettext)
-RUN /usr/local/bin/uv pip install polib
+# Installer gettext (fournit msgfmt pour compiler .po → .mo sans charger Django)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gettext && \
+    rm -rf /var/lib/apt/lists/*
+
+# Compiler les traductions — même logique : chemin dynamique selon la version Python
 RUN SITE_PKG=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
-    python3 -c "import os,polib,sys; b=os.path.join(sys.argv[1],'netbox_device_search','locale'); [polib.pofile(os.path.join(b,l,'LC_MESSAGES','django.po')).save_as_mofile(os.path.join(b,l,'LC_MESSAGES','django.mo')) for l in ('fr','en')]" "$SITE_PKG"
+    LOCALE_DIR="$SITE_PKG/netbox_device_search/locale" && \
+    msgfmt "$LOCALE_DIR/fr/LC_MESSAGES/django.po" \
+           -o "$LOCALE_DIR/fr/LC_MESSAGES/django.mo" && \
+    msgfmt "$LOCALE_DIR/en/LC_MESSAGES/django.po" \
+           -o "$LOCALE_DIR/en/LC_MESSAGES/django.mo"
 
 # Supprimer le cache Python compilé pour forcer la relecture des fichiers
 RUN rm -rf /etc/netbox/config/__pycache__

@@ -1,0 +1,334 @@
+{% extends 'base/layout.html' %}
+{% load i18n %}
+
+{% block title %}{{ rack.name }} — {% trans "Rack elevation" %}{% endblock %}
+
+{% block content %}
+<style>
+/* ── Élévation de baie : les deux faces côte à côte ───────────────────────
+   Tout est préfixé .nds- (netbox_device_search) pour ne jamais entrer en
+   conflit avec le CSS de NetBox. Les couleurs s'appuient sur les variables
+   Bootstrap de NetBox : le rendu suit automatiquement le thème clair/sombre. */
+.nds-rack        { --nds-accent:#14B8A6; }
+
+/* Châssis */
+.nds-rack-frame  { border:2px solid rgba(148,163,184,.40); border-radius:.5rem;
+                   background:rgba(148,163,184,.06); padding:.6rem; }
+
+/* Grille à 3 colonnes : face avant | rail des U partagé | face arrière.
+   Un seul rail au centre : les deux faces sont forcément alignées, et on
+   économise la moitié des numéros à l'écran. */
+.nds-rack-grid   { display:grid; grid-template-columns:1fr 34px 1fr;
+                   gap:0 .4rem; align-items:start; }
+.nds-face-head   { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
+                   color:var(--bs-secondary-color); padding-bottom:.4rem;
+                   display:flex; align-items:center; gap:.35rem; }
+.nds-face-head--rear { justify-content:flex-end; }
+.nds-rail-head   { text-align:center; font-size:.66rem; font-weight:600;
+                   color:var(--bs-secondary-color); padding-bottom:.4rem; }
+
+/* Une face = un conteneur relatif. Le quadrillage des U est dessiné par deux
+   dégradés répétés (une ligne tous les 1 U, une bande grisée tous les 2 U) :
+   zéro élément HTML, donc pas 84 <div> inutiles dans le DOM.
+   box-shadow inset plutôt que border : la bordure ne décale pas la géométrie,
+   les blocs restent alignés au pixel avec le rail. */
+/* Trame : un trait de 1 px en haut de chaque U + une bande grisée tous les 2 U.
+   Les couleurs sont des rgba explicites et NON var(--bs-border-color) : dans le
+   thème sombre de NetBox cette variable vaut presque la couleur du fond, la
+   trame devenait invisible. Le gris neutre semi-transparent, lui, ressort sur
+   fond clair comme sur fond sombre.
+   Les distances sont écrites en px par le gabarit (pas de calc(var(...))) :
+   une seule expression invalide et le navigateur jette TOUT le background. */
+.nds-face        { position:relative; border-radius:.25rem; overflow:hidden;
+                   box-shadow:inset 0 0 0 1px rgba(148,163,184,.35);
+                   background-color:rgba(148,163,184,.04);
+                   background-image:
+                     repeating-linear-gradient(to bottom,
+                        rgba(148,163,184,.30) 0, rgba(148,163,184,.30) 1px,
+                        transparent 1px, transparent {{ elevation.unit_px }}px),
+                     repeating-linear-gradient(to bottom,
+                        rgba(148,163,184,.075) 0, rgba(148,163,184,.075) {{ elevation.unit_px }}px,
+                        transparent {{ elevation.unit_px }}px, transparent {{ elevation.unit_band_px }}px); }
+
+/* Rail central : une cellule par U, exactement la même hauteur que la trame */
+.nds-rail        { display:flex; flex-direction:column; }
+.nds-rail span   { height:{{ elevation.unit_px }}px; display:flex; align-items:center;
+                   justify-content:center; font-family:var(--bs-font-monospace, monospace);
+                   font-size:.66rem; color:var(--bs-secondary-color); user-select:none; }
+/* Un repère tous les 5 U : on lit une position sans compter les lignes. */
+.nds-rail .nds-u-major { color:var(--bs-body-color); font-weight:700; }
+
+/* Équipements */
+.nds-device      { position:absolute; left:2px; right:2px; box-sizing:border-box;
+                   display:flex; align-items:center; justify-content:space-between;
+                   gap:.4rem; padding:.1rem .4rem; overflow:hidden;
+                   border-radius:.2rem; text-decoration:none;
+                   border:1px solid var(--nds-c); border-left:4px solid var(--nds-c);
+                   background:var(--nds-bg); color:var(--bs-body-color);
+                   transition:transform .12s ease, box-shadow .12s ease; }
+.nds-device:hover{ transform:translateX(2px); box-shadow:0 0 0 2px var(--nds-c);
+                   color:var(--bs-body-color); z-index:2; }
+
+/* Couleur par statut — mêmes teintes que la charte du projet */
+.nds-device                  { --nds-c:#64748B; --nds-bg:rgba(100,116,139,.22); }
+.nds-device--active          { --nds-c:#14B8A6; --nds-bg:rgba(20,184,166,.20); }
+.nds-device--planned         { --nds-c:#0EA5E9; --nds-bg:rgba(14,165,233,.20); }
+.nds-device--staged          { --nds-c:#8B5CF6; --nds-bg:rgba(139,92,246,.20); }
+.nds-device--failed          { --nds-c:#EF4444; --nds-bg:rgba(239,68,68,.22); }
+.nds-device--offline         { --nds-c:#F59E0B; --nds-bg:rgba(245,158,11,.20); }
+.nds-device--decommissioning { --nds-c:#F59E0B; --nds-bg:rgba(245,158,11,.20); }
+.nds-device--tiny            { padding:0 .35rem; }
+.nds-device--tiny .nds-device-name,
+.nds-device--tiny .nds-device-meta,
+.nds-device--tiny .nds-device-tail { font-size:.6rem; }
+
+.nds-device-main { display:flex; flex-direction:column; min-width:0; line-height:1.15; }
+.nds-device--compact .nds-device-main { flex-direction:row; align-items:baseline; gap:.35rem; }
+.nds-device-name { font-weight:600; font-size:.78rem; white-space:nowrap;
+                   overflow:hidden; text-overflow:ellipsis; }
+.nds-device-meta { font-size:.68rem; color:var(--bs-secondary-color); white-space:nowrap;
+                   overflow:hidden; text-overflow:ellipsis; }
+.nds-device-tail { flex:0 0 auto; font-size:.64rem;
+                   font-family:var(--bs-font-monospace, monospace);
+                   color:var(--bs-secondary-color); white-space:nowrap; }
+
+.nds-face-empty  { position:absolute; top:50%; left:0; right:0; transform:translateY(-50%);
+                   text-align:center; font-size:.8rem; color:var(--bs-secondary-color); }
+
+.nds-legend      { display:flex; flex-wrap:wrap; gap:.75rem; font-size:.72rem;
+                   color:var(--bs-secondary-color); }
+.nds-legend span { display:inline-flex; align-items:center; gap:.3rem; }
+.nds-legend i    { width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+/* Sous 992 px les deux faces deviennent trop étroites : on masque les modèles
+   pour ne garder que le nom et la position. */
+@media (max-width: 991.98px) {
+  .nds-device--compact .nds-device-meta { display:none; }
+}
+</style>
+
+<div class="container-fluid nds-rack">
+
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0"><i class="mdi mdi-server text-info"></i> {{ rack.name }}</h2>
+            <small class="text-muted">
+                <i class="mdi mdi-map-marker"></i> {{ rack.site.name }}
+                {% if rack.location %}
+                    · <i class="mdi mdi-office-building"></i> {{ rack.location.name }}
+                {% else %}
+                    · <span class="text-warning">{% trans "Not in a datacenter" %}</span>
+                {% endif %}
+                · {{ elevation.u_count }} U
+            </small>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{% url 'plugins:netbox_device_search:site_detail' rack.site.id %}" class="btn btn-outline-secondary">
+                <i class="mdi mdi-arrow-left"></i> {{ rack.site.name }}
+            </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+
+        <!-- ══ Élévation : face avant + face arrière ═════════════════════ -->
+        <div class="col-xl-8">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="mdi mdi-server-network text-info"></i>
+                        <strong>{% trans "Rack elevation" %}</strong>
+                    </span>
+                    <span class="badge bg-secondary">{{ elevation.racked_count }} / {{ elevation.total_count }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="nds-rack-frame">
+                        <div class="nds-rack-grid">
+
+                            <!-- Ligne 1 : les intitulés -->
+                            <div class="nds-face-head">
+                                <i class="mdi mdi-arrow-collapse-down"></i> {% trans "Front" %}
+                                <span class="badge bg-secondary">{{ elevation.front_count }}</span>
+                            </div>
+                            <div class="nds-rail-head">U</div>
+                            <div class="nds-face-head nds-face-head--rear">
+                                <span class="badge bg-secondary">{{ elevation.rear_count }}</span>
+                                {% trans "Rear" %} <i class="mdi mdi-arrow-collapse-up"></i>
+                            </div>
+
+                            <!-- Ligne 2 : face avant | rail | face arrière -->
+                            <div class="nds-face" style="height:{{ elevation.body_height }}px">
+                                {% for block in elevation.front %}
+                                <a class="nds-device nds-device--{{ block.device.status }}{% if block.compact %} nds-device--compact{% endif %}{% if block.tiny %} nds-device--tiny{% endif %}"
+                                   style="{{ block.style }}"
+                                   href="{% url 'plugins:netbox_device_search:device_detail' block.device.id %}"
+                                   title="{{ block.device.name }} — {{ block.label_u }} — {{ block.device.role.name|default:'' }} — {{ block.device.get_status_display }}">
+                                    <span class="nds-device-main">
+                                        <span class="nds-device-name">{{ block.device.name }}</span>
+                                        <span class="nds-device-meta">
+                                            {{ block.device.device_type.manufacturer.name|default:"" }}
+                                            {{ block.device.device_type.model }}
+                                        </span>
+                                    </span>
+                                    <span class="nds-device-tail">{{ block.label_u }}</span>
+                                </a>
+                                {% empty %}
+                                <div class="nds-face-empty">{% trans "No device mounted on this face" %}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="nds-rail">
+                                {% for u in elevation.units %}<span{% if u|divisibleby:5 %} class="nds-u-major"{% endif %}>{{ u }}</span>{% endfor %}
+                            </div>
+
+                            <div class="nds-face" style="height:{{ elevation.body_height }}px">
+                                {% for block in elevation.rear %}
+                                <a class="nds-device nds-device--{{ block.device.status }}{% if block.compact %} nds-device--compact{% endif %}{% if block.tiny %} nds-device--tiny{% endif %}"
+                                   style="{{ block.style }}"
+                                   href="{% url 'plugins:netbox_device_search:device_detail' block.device.id %}"
+                                   title="{{ block.device.name }} — {{ block.label_u }} — {{ block.device.role.name|default:'' }} — {{ block.device.get_status_display }}">
+                                    <span class="nds-device-main">
+                                        <span class="nds-device-name">{{ block.device.name }}</span>
+                                        <span class="nds-device-meta">
+                                            {{ block.device.device_type.manufacturer.name|default:"" }}
+                                            {{ block.device.device_type.model }}
+                                        </span>
+                                    </span>
+                                    <span class="nds-device-tail">{{ block.label_u }}</span>
+                                </a>
+                                {% empty %}
+                                <div class="nds-face-empty">{% trans "No device mounted on this face" %}</div>
+                                {% endfor %}
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="nds-legend mt-3">
+                        <span><i style="background:#14B8A6"></i> {% trans "Active" %}</span>
+                        <span><i style="background:#0EA5E9"></i> {% trans "Planned" %}</span>
+                        <span><i style="background:#8B5CF6"></i> {% trans "Staged" %}</span>
+                        <span><i style="background:#EF4444"></i> {% trans "Failed" %}</span>
+                        <span><i style="background:#F59E0B"></i> {% trans "Offline" %}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ Colonne de droite ═════════════════════════════════════════ -->
+        <div class="col-xl-4">
+
+            <!-- Occupation -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header">
+                    <i class="mdi mdi-chart-donut text-primary"></i>
+                    <strong>{% trans "Occupancy" %}</strong>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted small">
+                            {{ elevation.occupied_u }} / {{ elevation.u_count }} U {% trans "occupied" %}
+                        </span>
+                        <span class="fw-bold">{{ elevation.fill_percent }} %</span>
+                    </div>
+                    <div class="progress" style="height:10px">
+                        <div class="progress-bar bg-info" role="progressbar" style="{{ elevation.fill_style }}"></div>
+                    </div>
+                    <div class="row text-center mt-3 g-2">
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold">{{ elevation.free_u }}</div>
+                            <div class="text-muted small">{% trans "free U" %}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold text-info">{{ elevation.racked_count }}</div>
+                            <div class="text-muted small">{% trans "placed" %}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold {% if elevation.unracked_count %}text-warning{% endif %}">
+                                {{ elevation.unracked_count }}
+                            </div>
+                            <div class="text-muted small">{% trans "not placed" %}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Équipements non mis en baie -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <i class="mdi mdi-tray-remove text-warning"></i>
+                    <strong>{% trans "Not placed in the rack" %}</strong>
+                    <span class="badge {% if elevation.unracked_count %}bg-warning text-dark{% else %}bg-secondary{% endif %} ms-2">
+                        {{ elevation.unracked_count }}
+                    </span>
+                </div>
+                <div class="card-body p-0">
+                    {% if elevation.unracked %}
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">{% trans "Name" %}</th>
+                                <th>{% trans "Manufacturer / Model" %}</th>
+                                <th>{% trans "Reason" %}</th>
+                                <th>{% trans "Status" %}</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in elevation.unracked %}
+                            <tr>
+                                <td class="ps-3 fw-bold">
+                                    {{ device.name }}
+                                    <div class="text-muted fw-normal small">{{ device.role.name|default:"—" }}</div>
+                                </td>
+                                <td class="small">
+                                    {{ device.device_type.manufacturer.name|default:"" }}
+                                    {% if device.device_type.manufacturer.name %}—{% endif %}
+                                    {{ device.device_type.model|default:"—" }}
+                                </td>
+                                <td class="small text-muted">
+                                    {% if not device.device_type.u_height %}
+                                        {% trans "0U device (not rack-mountable)" %}
+                                    {% else %}
+                                        {% trans "No position assigned" %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge
+                                        {% if device.status == 'active' %}bg-success
+                                        {% elif device.status == 'failed' %}bg-danger
+                                        {% elif device.status == 'planned' %}bg-info
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ device.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="pe-3">
+                                    <a href="{% url 'plugins:netbox_device_search:device_detail' device.id %}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="mdi mdi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% elif elevation.total_count %}
+                    <div class="p-3 text-muted">
+                        <i class="mdi mdi-check-circle text-success"></i>
+                        {% trans "All devices are placed in the rack." %}
+                    </div>
+                    {% else %}
+                    <div class="p-3 text-muted">{% trans "This rack is empty." %}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,252 @@
+{% extends 'base/layout.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{% trans "Factory floor plan" %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    {# ══════════════════ En-tête : titre + sélecteurs + actions ══════════════════ #}
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="fw-bold mb-0">
+            <i class="mdi mdi-floor-plan" style="color:#14B8A6;"></i>
+            {% trans "Factory floor plan" %}
+        </h2>
+
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            {% comment %}
+            Changement de plan / de site : simple GET, pas de JS nécessaire.
+            Une page qui marche sans JavaScript pour la navigation de base,
+            c'est plus robuste et ça reste bookmarkable.
+            {% endcomment %}
+            <form method="get" class="d-flex gap-2 align-items-center">
+                {% if plans|length > 1 %}
+                <select name="plan" class="form-select form-select-sm" onchange="this.form.submit()">
+                    {% for p in plans %}
+                    <option value="{{ p.slug }}" {% if p.slug == plan.slug %}selected{% endif %}>
+                        {{ p.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+
+                <select name="site" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">{% trans "All sites" %}</option>
+                    {% for s in sites %}
+                    <option value="{{ s.id }}" {% if selected_site and s.id == selected_site.id %}selected{% endif %}>
+                        {{ s.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+            {% if can_edit %}
+            <button type="button" id="btn-toggle-edit" class="btn btn-sm btn-outline-warning">
+                <i class="mdi mdi-cursor-move"></i> {% trans "Placement mode" %}
+            </button>
+            {% endif %}
+
+            <a href="{% url 'plugins:netbox_device_search:site_browser' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="mdi mdi-format-list-bulleted"></i> {% trans "List view" %}
+            </a>
+
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
+        </div>
+    </div>
+
+    {# ══════════════════ Bandeau du mode placement ══════════════════ #}
+    {% if can_edit %}
+    <div id="edit-banner" class="alert alert-warning d-none align-items-center gap-2 py-2">
+        <i class="mdi mdi-information-outline fs-5"></i>
+        <span id="edit-instruction">
+            {% trans "Select a rack on the left, then click on the plan to place it." %}
+        </span>
+    </div>
+    {% endif %}
+
+    <div class="row g-3">
+
+        {# ══════════════════ Panneau latéral : baies à placer ══════════════════ #}
+        {% if can_edit %}
+        <div id="unplaced-panel" class="col-lg-3 d-none">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="mdi mdi-server-off text-warning"></i> {% trans "Racks to place" %}</span>
+                    <span class="badge bg-secondary" id="unplaced-count">{{ racks_unplaced|length }}</span>
+                </div>
+                <div class="card-body p-2" style="max-height:70vh; overflow-y:auto;">
+                    <input type="text" id="rack-filter" class="form-control form-control-sm mb-2"
+                           placeholder="{% trans 'Filter…' %}">
+                    <div id="unplaced-list" class="list-group list-group-flush">
+                        {% for rack in racks_unplaced %}
+                        {% comment %}
+                        Toutes les infos utiles au JS sont en data-attributes.
+                        Django les échappe automatiquement, et le JS n'a plus
+                        à re-parser du texte affiché — une donnée d'affichage
+                        n'est jamais une source de données fiable.
+                        {% endcomment %}
+                        <button type="button"
+                                class="list-group-item list-group-item-action py-2 rack-pick"
+                                data-rack-id="{{ rack.id }}"
+                                data-rack-name="{{ rack.name }}"
+                                data-rack-site="{{ rack.site }}"
+                                data-rack-location="{{ rack.location|default:'' }}"
+                                data-rack-devices="{{ rack.device_count }}">
+                            <div class="fw-semibold"><i class="mdi mdi-server"></i> {{ rack.name }}</div>
+                            <small class="text-muted">
+                                {{ rack.site }}{% if rack.location %} · {{ rack.location }}{% endif %}
+                                · {{ rack.device_count }} {% trans "device(s)" %}
+                            </small>
+                        </button>
+                        {% empty %}
+                        <p class="text-muted small mb-0 p-2">{% trans "All racks are placed." %}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ══════════════════ Le plan ══════════════════ #}
+        <div id="plan-col" class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <span class="text-muted small">
+                        <i class="mdi mdi-map-marker-multiple"></i>
+                        <strong id="placed-count">{{ racks_placed|length }}</strong> {% trans "rack(s) on this plan" %}
+                    </span>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" id="zoom-out" title="{% trans 'Zoom out' %}">
+                            <i class="mdi mdi-magnify-minus-outline"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="zoom-reset" title="{% trans 'Reset view' %}">
+                            <i class="mdi mdi-fit-to-page-outline"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="zoom-in" title="{% trans 'Zoom in' %}">
+                            <i class="mdi mdi-magnify-plus-outline"></i>
+                        </button>
+                    </div>
+                </div>
+
+                {% comment %}
+                Le viewport masque ce qui dépasse ; le "stage" à l'intérieur est
+                ce qu'on déplace et met à l'échelle. Fond blanc forcé : le plan
+                est un dessin noir sur blanc, il resterait illisible sous le
+                thème sombre de NetBox.
+                {% endcomment %}
+                <div id="plan-viewport"
+                     style="position:relative; overflow:hidden; background:#FFFFFF;
+                            height:72vh; cursor:grab; border-radius:0 0 .375rem .375rem;">
+
+                    <div id="plan-stage" style="position:absolute; top:0; left:0; transform-origin:0 0;">
+                        <img id="plan-image"
+                             src="{% if plan.image_url %}{{ plan.image_url }}{% else %}{% static plan.image %}{% endif %}"
+                             alt="{{ plan.label }}"
+                             draggable="false"
+                             style="display:block; user-select:none; -webkit-user-drag:none;">
+
+                        {% comment %}
+                        Les marqueurs sont injectés ici par le JS, en position
+                        absolue exprimée en % — donc solidaires de l'image quel
+                        que soit le zoom, sans recalcul manuel.
+                        {% endcomment %}
+                        <div id="markers" style="position:absolute; inset:0;"></div>
+                    </div>
+                </div>
+
+                <div class="card-footer py-2 d-flex gap-3 flex-wrap small text-muted">
+                    <span><span class="fp-dot" style="background:#14B8A6;"></span> {% trans "Active" %}</span>
+                    <span><span class="fp-dot" style="background:#0EA5E9;"></span> {% trans "Planned" %}</span>
+                    <span><span class="fp-dot" style="background:#F59E0B;"></span> {% trans "Other status" %}</span>
+                    <span class="ms-auto">
+                        <i class="mdi mdi-mouse"></i> {% trans "Scroll to zoom · drag to pan · click a rack to open it" %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% comment %}
+Données passées au JS — via un bloc application/json et non un <script> généré :
+le contenu n'est jamais exécuté comme du code, donc un nom de baie contenant des
+caractères exotiques ne peut pas casser la page ni injecter de JS.
+{% endcomment %}
+{{ racks_placed_json|json_script:"racks-data" }}
+
+{% comment %}
+Jeton CSRF pour les POST du JS. Le rendre ici plutôt que de compter sur le
+cookie : c'est la source recommandée par Django, et la seule lisible si
+CSRF_COOKIE_HTTPONLY est activé. Effet de bord utile : le rendre force aussi
+Django à poser le cookie sur cette page.
+{% endcomment %}
+<form id="fp-csrf" hidden>{% csrf_token %}</form>
+
+<div id="fp-config"
+     data-plan-slug="{{ plan.slug }}"
+     data-can-edit="{{ can_edit|yesno:'1,0' }}"
+     data-url-save="{% url 'plugins:netbox_device_search:api_plan_save_position' %}"
+     data-url-clear="{% url 'plugins:netbox_device_search:api_plan_clear_position' %}"
+     data-url-rack-base="{% url 'plugins:netbox_device_search:rack_detail' 0 %}"
+     data-label-devices="{% trans 'device(s)' %}"
+     data-label-remove="{% trans 'Remove from plan' %}"
+     data-label-open="{% trans 'Open rack' %}"
+     data-label-click-plan="{% trans 'Now click on the plan to place' %}"
+     data-label-saved="{% trans 'Position saved' %}"
+     data-label-error="{% trans 'Save failed' %}"
+     hidden></div>
+
+<style>
+    .fp-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
+
+    /* Le marqueur est ancré par son centre sur le point (x%, y%).
+       translate(-50%,-50%) évite d'avoir à corriger l'offset à la main. */
+    .fp-marker {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        cursor: pointer;
+        z-index: 5;
+    }
+    .fp-marker-body {
+        display: flex; align-items: center; gap: 5px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #FFFFFF;
+        border: 2px solid #14B8A6;
+        box-shadow: 0 2px 6px rgba(15,23,42,.25);
+        font-size: 12px; font-weight: 600; color: #0F172A;
+        white-space: nowrap;
+        transition: box-shadow .15s ease, border-color .15s ease;
+    }
+    .fp-marker:hover .fp-marker-body {
+        box-shadow: 0 4px 14px rgba(15,23,42,.4);
+        border-color: #0EA5E9;
+    }
+    .fp-marker.is-selected .fp-marker-body { border-color:#F59E0B; border-width:3px; }
+    .fp-marker-count {
+        background:#0F172A; color:#fff; border-radius:999px;
+        padding:0 6px; font-size:10px; line-height:16px;
+    }
+
+    /* Mode placement : le curseur annonce qu'un clic va poser quelque chose. */
+    #plan-viewport.is-placing { cursor: crosshair !important; }
+    #plan-viewport.is-panning { cursor: grabbing !important; }
+
+    /* En mode placement, un marqueur n'est plus un lien mais un objet qu'on
+       déplace : le curseur doit le dire avant que l'utilisateur ne clique. */
+    #plan-viewport.is-editing .fp-marker { cursor: move; }
+
+    .rack-pick.is-armed { background:#F59E0B22; border-left:4px solid #F59E0B; }
+</style>
+
+{% comment %}
+Le ?v= est du cache busting manuel : sans lui, le navigateur peut resservir
+indéfiniment une version périmée du script depuis son cache, même après un
+rebuild de l'image. Incrémenter ce numéro à chaque modification du JS force
+le rechargement, parce que l'URL change et qu'une URL est la clé de cache.
+{% endcomment %}
+<script src="{% static 'netbox_device_search/js/floorplan.js' %}?v=3" defer></script>
+{% endblock %}

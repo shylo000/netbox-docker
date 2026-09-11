@@ -1,0 +1,550 @@
+{% extends 'base/layout.html' %}
+
+{% block title %}Connecter {{ device.name }} — Sélection Port{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="mdi mdi-cable-data text-primary"></i>
+                Connexion de <span class="text-primary">{{ device.name }}</span>
+            </h2>
+            <p class="text-muted mb-0">
+                <span class="badge bg-success">Étape 3/3</span> 
+                Sélection du port sur <strong>{{ switch.name }}</strong>
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'plugins:netbox_device_search:device_connect_switch' device.id switch.rack.id %}" class="btn btn-outline-secondary">
+                <i class="mdi mdi-arrow-left"></i> Retour
+            </a>
+            <a href="{% url 'plugins:netbox_device_search:device_detail' device.id %}" class="btn btn-outline-danger">
+                <i class="mdi mdi-close"></i> Annuler
+            </a>
+        </div>
+    </div>
+
+    <!-- Progression -->
+    <div class="mb-5">
+        <div class="row text-center">
+            <div class="col-md-4">
+                <div class="card border-success">
+                    <div class="card-body py-2">
+                        <i class="mdi mdi-check-circle fs-4 text-success"></i>
+                        <p class="mb-0 small text-success">✓ Site & Baie</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-success">
+                    <div class="card-body py-2">
+                        <i class="mdi mdi-check-circle fs-4 text-success"></i>
+                        <p class="mb-0 small text-success">✓ Switch</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-primary shadow-sm">
+                    <div class="card-body py-2">
+                        <i class="mdi mdi-ethernet fs-4 text-primary"></i>
+                        <p class="mb-0 small fw-bold">3. Port</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Switch -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-primary">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <i class="mdi mdi-server text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <div class="col">
+                            <h4 class="mb-1">{{ switch.name }}</h4>
+                            <p class="mb-0 text-muted">
+                                {{ switch.device_type.manufacturer.name }} {{ switch.device_type.model }}
+                            </p>
+                        </div>
+                        <div class="col-auto">
+                            <span class="badge bg-success fs-6">{{ ports_data|length }} ports</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="mb-2">Légende :</h6>
+                    <div class="d-flex flex-column gap-2">
+                        <div><span class="port-badge port-free">1</span> Port libre (connecter)</div>
+                        <div><span class="port-badge port-occupied">2</span> Port occupé (voir détails)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panneau Frontal du Switch -->
+    <div class="card shadow-lg border-0 mb-4">
+        <div class="card-header bg-dark text-white py-3">
+            <i class="mdi mdi-ethernet"></i>
+            <strong>Panneau Frontal — {{ switch.name }}</strong>
+            <span class="float-end">
+                <span id="free_ports_count" class="badge bg-success"></span>
+            </span>
+        </div>
+        <div class="card-body p-4" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
+            
+            <!-- Grille des ports -->
+            <div class="switch-panel">
+                {% for port_info in ports_data %}
+                <div class="port-container" 
+                     data-port-id="{{ port_info.port.id }}"
+                     data-port-name="{{ port_info.port.name }}"
+                     data-port-status="{% if port_info.port.cable %}occupied{% else %}free{% endif %}"
+                     data-connected-device-id="{% if port_info.connected_device_id %}{{ port_info.connected_device_id }}{% else %}{% endif %}"
+                     data-connected-device-name="{% if port_info.connected_device_name %}{{ port_info.connected_device_name }}{% else %}{% endif %}"
+                     data-connected-device-manufacturer="{% if port_info.connected_device_manufacturer %}{{ port_info.connected_device_manufacturer }}{% else %}{% endif %}"
+                     data-connected-device-model="{% if port_info.connected_device_model %}{{ port_info.connected_device_model }}{% else %}{% endif %}"
+                     data-connected-device-role="{% if port_info.connected_device_role %}{{ port_info.connected_device_role }}{% else %}{% endif %}"
+                     data-connected-port="{% if port_info.connected_port_name %}{{ port_info.connected_port_name }}{% else %}{% endif %}"
+                     onclick="handlePortClick(this)">
+                    
+                    <div class="port-badge {% if port_info.port.cable %}port-occupied{% else %}port-free{% endif %}">
+                        {{ forloop.counter }}
+                    </div>
+                    
+                    <div class="port-name">{{ port_info.port.name }}</div>
+                    
+                    <!-- Indicateur LED -->
+                    <div class="port-led {% if port_info.port.cable %}led-orange{% else %}led-green{% endif %}"></div>
+                </div>
+                {% endfor %}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal : Port Occupé -->
+    <div class="modal fade" id="occupiedPortModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="mdi mdi-alert-circle-outline"></i>
+                        Port Occupé
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="mdi mdi-cable-data"></i>
+                        Ce port est déjà connecté à un autre équipement.
+                    </div>
+                    
+                    <!-- Infos du Port -->
+                    <h6 class="text-muted mb-3"><i class="mdi mdi-ethernet"></i> Informations du Port</h6>
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="40%" class="text-muted">Port du switch :</th>
+                            <td><code id="modal_port_name" class="fs-6"></code></td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted">Port distant :</th>
+                            <td><code id="modal_connected_port" class="fs-6"></code></td>
+                        </tr>
+                    </table>
+                    
+                    <hr>
+                    
+                    <!-- Infos du Device Connecté -->
+                    <h6 class="text-muted mb-3"><i class="mdi mdi-server"></i> Device Connecté</h6>
+                    <table class="table table-sm table-hover">
+                        <tr>
+                            <th width="40%" class="text-muted">Nom :</th>
+                            <td><strong id="modal_connected_device_name" class="text-primary fs-5"></strong></td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted">Fabricant :</th>
+                            <td id="modal_connected_device_manufacturer" class="fs-6"></td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted">Modèle :</th>
+                            <td id="modal_connected_device_model" class="fs-6"></td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted">Rôle :</th>
+                            <td><span id="modal_connected_device_role" class="badge bg-info"></span></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="mdi mdi-close"></i> Fermer
+                    </button>
+                    <a href="#" id="modal_go_to_device" class="btn btn-primary btn-lg">
+                        <i class="mdi mdi-arrow-right"></i> Voir ce device
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Détails du port sélectionné (libre) -->
+    <div id="port_details" class="card shadow-lg border-primary" style="display: none;">
+        <div class="card-header bg-primary text-white">
+            <i class="mdi mdi-information"></i>
+            <strong>Port sélectionné</strong>
+        </div>
+        <div class="card-body">
+            <form method="post" id="connect_form">
+                {% csrf_token %}
+                <input type="hidden" name="port_id" id="selected_port_id">
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Port</label>
+                        <input type="text" class="form-control form-control-lg" id="selected_port_name" readonly>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Type de câble</label>
+                        <select class="form-select form-select-lg" name="cable_type">
+                            <option value="cat6" selected>CAT6 (recommandé)</option>
+                            <option value="cat5e">CAT5e</option>
+                            <option value="cat6a">CAT6a</option>
+                            <option value="cat8">CAT8</option>
+                            <option value="smf">Fibre mono-mode</option>
+                            <option value="mmf">Fibre multi-mode</option>
+                            <option value="dac-active">DAC Actif</option>
+                            <option value="dac-passive">DAC Passif</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="alert alert-success mt-3">
+                    <i class="mdi mdi-check-circle"></i>
+                    <strong>{{ device.name }}</strong> sera connecté au port 
+                    <strong id="confirm_port_name"></strong> sur <strong>{{ switch.name }}</strong>
+                </div>
+
+                <div class="d-flex gap-3 mt-4">
+                    <button type="submit" class="btn btn-success btn-lg px-5">
+                        <i class="mdi mdi-check-bold"></i> Connecter maintenant
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-lg" onclick="deselectPort()">
+                        Annuler
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════ */
+/* STYLES PANNEAU FRONTAL                                          */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.switch-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 15px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 10px;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.port-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 10px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    cursor: pointer;
+}
+
+.port-container[data-port-status="free"]:hover {
+    background: rgba(40, 167, 69, 0.1);
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+}
+
+.port-container[data-port-status="occupied"]:hover {
+    background: rgba(255, 193, 7, 0.1);
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 5px 15px rgba(255, 193, 7, 0.3);
+}
+
+.port-container.selected {
+    background: rgba(13, 110, 253, 0.2);
+    border: 2px solid #0d6efd;
+    transform: scale(1.1);
+}
+
+/* Badge du port */
+.port-badge {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.port-free {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.port-occupied {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+}
+
+.port-container:hover .port-badge {
+    transform: scale(1.15);
+}
+
+/* Nom du port */
+.port-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #495057;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/* LED Indicateur */
+.port-led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 5px currentColor;
+}
+
+.led-green {
+    background: #28a745;
+    box-shadow: 0 0 10px #28a745;
+}
+
+.led-orange {
+    background: #fd7e14;
+    box-shadow: 0 0 10px #fd7e14;
+}
+
+/* Animation d'entrée */
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.port-container {
+    animation: fadeSlideUp 0.4s ease-out forwards;
+    opacity: 0;
+}
+
+/* Délai progressif pour effet cascade - premiers 50 ports */
+.port-container:nth-child(1) { animation-delay: 0.02s; }
+.port-container:nth-child(2) { animation-delay: 0.04s; }
+.port-container:nth-child(3) { animation-delay: 0.06s; }
+.port-container:nth-child(4) { animation-delay: 0.08s; }
+.port-container:nth-child(5) { animation-delay: 0.10s; }
+.port-container:nth-child(6) { animation-delay: 0.12s; }
+.port-container:nth-child(7) { animation-delay: 0.14s; }
+.port-container:nth-child(8) { animation-delay: 0.16s; }
+.port-container:nth-child(9) { animation-delay: 0.18s; }
+.port-container:nth-child(10) { animation-delay: 0.20s; }
+.port-container:nth-child(11) { animation-delay: 0.22s; }
+.port-container:nth-child(12) { animation-delay: 0.24s; }
+.port-container:nth-child(13) { animation-delay: 0.26s; }
+.port-container:nth-child(14) { animation-delay: 0.28s; }
+.port-container:nth-child(15) { animation-delay: 0.30s; }
+.port-container:nth-child(16) { animation-delay: 0.32s; }
+.port-container:nth-child(17) { animation-delay: 0.34s; }
+.port-container:nth-child(18) { animation-delay: 0.36s; }
+.port-container:nth-child(19) { animation-delay: 0.38s; }
+.port-container:nth-child(20) { animation-delay: 0.40s; }
+.port-container:nth-child(21) { animation-delay: 0.42s; }
+.port-container:nth-child(22) { animation-delay: 0.44s; }
+.port-container:nth-child(23) { animation-delay: 0.46s; }
+.port-container:nth-child(24) { animation-delay: 0.48s; }
+.port-container:nth-child(n+25) { animation-delay: 0.50s; } /* Le reste apparaît ensemble */
+
+/* Animation du panneau de détails */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#port_details {
+    animation: slideDown 0.4s ease-out;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .switch-panel {
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+        gap: 10px;
+    }
+    
+    .port-badge {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+}
+</style>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// GESTION DES CLICS SUR LES PORTS (libres et occupés)
+// ═══════════════════════════════════════════════════════════════════
+
+let selectedPortElement = null;
+
+// Au chargement, compter les ports libres
+document.addEventListener('DOMContentLoaded', function() {
+    updateFreePortsCount();
+});
+
+function updateFreePortsCount() {
+    const freePorts = document.querySelectorAll('.port-container[data-port-status="free"]').length;
+    document.getElementById('free_ports_count').textContent = freePorts + ' ports libres';
+}
+
+// Gestion du clic sur un port (libre ou occupé)
+function handlePortClick(portElement) {
+    const status = portElement.dataset.portStatus;
+    
+    if (status === 'free') {
+        // Port libre → Sélectionner pour connexion
+        selectPort(portElement);
+    } else {
+        // Port occupé → Afficher la modal avec les infos
+        showOccupiedPortModal(portElement);
+    }
+}
+
+// Sélectionner un port libre
+function selectPort(portElement) {
+    // Désélectionner l'ancien port
+    if (selectedPortElement) {
+        selectedPortElement.classList.remove('selected');
+    }
+    
+    // Sélectionner le nouveau port
+    selectedPortElement = portElement;
+    portElement.classList.add('selected');
+    
+    // Remplir les infos
+    const portId = portElement.dataset.portId;
+    const portName = portElement.dataset.portName;
+    
+    document.getElementById('selected_port_id').value = portId;
+    document.getElementById('selected_port_name').value = portName;
+    document.getElementById('confirm_port_name').textContent = portName;
+    
+    // Afficher le panneau de détails
+    const detailsPanel = document.getElementById('port_details');
+    detailsPanel.style.display = 'block';
+    
+    // Scroll vers le panneau
+    detailsPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Afficher la modal pour un port occupé
+function showOccupiedPortModal(portElement) {
+    const portName = portElement.dataset.portName;
+    const connectedDeviceName = portElement.dataset.connectedDeviceName;
+    const connectedDeviceId = portElement.dataset.connectedDeviceId;
+    const connectedDeviceManufacturer = portElement.dataset.connectedDeviceManufacturer;
+    const connectedDeviceModel = portElement.dataset.connectedDeviceModel;
+    const connectedDeviceRole = portElement.dataset.connectedDeviceRole;
+    const connectedPort = portElement.dataset.connectedPort;
+    
+    // Debug dans la console
+    console.log('Port cliqué:', {
+        portName,
+        connectedDeviceName,
+        connectedDeviceId,
+        connectedDeviceManufacturer,
+        connectedDeviceModel,
+        connectedDeviceRole,
+        connectedPort
+    });
+    
+    // Remplir la modal
+    document.getElementById('modal_port_name').textContent = portName || 'Inconnu';
+    document.getElementById('modal_connected_port').textContent = connectedPort || '—';
+    document.getElementById('modal_connected_device_name').textContent = connectedDeviceName || 'Inconnu';
+    document.getElementById('modal_connected_device_manufacturer').textContent = connectedDeviceManufacturer || '—';
+    document.getElementById('modal_connected_device_model').textContent = connectedDeviceModel || '—';
+    document.getElementById('modal_connected_device_role').textContent = connectedDeviceRole || '—';
+    
+    // Lien vers le device connecté
+    const goToDeviceBtn = document.getElementById('modal_go_to_device');
+    if (connectedDeviceId) {
+        goToDeviceBtn.href = '/plugins/device-search/device/' + connectedDeviceId + '/';
+        goToDeviceBtn.style.display = 'inline-block';
+    } else {
+        goToDeviceBtn.style.display = 'none';
+    }
+    
+    // Afficher la modal
+    const modal = new bootstrap.Modal(document.getElementById('occupiedPortModal'));
+    modal.show();
+}
+
+function deselectPort() {
+    if (selectedPortElement) {
+        selectedPortElement.classList.remove('selected');
+        selectedPortElement = null;
+    }
+    
+    document.getElementById('port_details').style.display = 'none';
+    document.getElementById('selected_port_id').value = '';
+}
+
+// Validation du formulaire
+document.getElementById('connect_form').addEventListener('submit', function(e) {
+    if (!document.getElementById('selected_port_id').value) {
+        e.preventDefault();
+        alert('Veuillez sélectionner un port.');
+    }
+});
+</script>
+
+{% endblock %}

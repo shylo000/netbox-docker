@@ -1,25 +1,9 @@
-{% extends 'base/layout.html' %}
+        {% extends 'base/layout.html' %}
 {% load i18n %}
 
 {% block title %}{% trans "Create a Device" %}{% endblock %}
 
 {% block content %}
-<style>
-    /* TomSelect n'ajoute pas de classe sur les options non sélectionnables :
-       il retire simplement l'attribut data-selectable. On s'appuie dessus
-       pour les griser, plutôt que d'inventer une classe qu'il faudrait
-       maintenir à la main. */
-    .ts-dropdown .option:not([data-selectable]) {
-        opacity: .45;
-        cursor: not-allowed;
-    }
-    .ts-dropdown .optgroup-header {
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: .72rem;
-        letter-spacing: .04em;
-    }
-</style>
 <div class="container-fluid">
 
     <!-- Barre navigation haut — même structure que toutes les autres vues -->
@@ -68,16 +52,12 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">{% trans "Site" %} <span class="text-danger">*</span></label>
-                            <select class="form-select" name="site" id="site_select" required>
+                            <select class="form-select" name="site" required>
                                 <option value="">— {% trans "Select a site" %} —</option>
                                 {% for site in sites %}
-                                <option value="{{ site.id }}" data-free="{{ site.free_port_count }}" {% if site.id|stringformat:"s" == prefill_site %}selected{% endif %}>{{ site.name }} · {{ site.rack_count }} {% trans "racks" %} · {{ site.free_port_count }} {% trans "free ports" %}</option>
+                                <option value="{{ site.id }}" {% if site.id|stringformat:"s" == prefill_site %}selected{% endif %}>{{ site.name }}</option>
                                 {% endfor %}
                             </select>
-                            <div class="form-text">
-                                <i class="mdi mdi-arrow-down-bold-outline text-info"></i>
-                                {% trans "Site, then rack, then switch, then port: each step unlocks the next one." %}
-                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -116,15 +96,12 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">{% trans "Rack" %}</label>
-                            <select class="form-select" name="rack" id="rack_select" disabled>
-                                <option value="">— {% trans "Select a site first" %} —</option>
+                            <select class="form-select" name="rack">
+                                <option value="">— {% trans "No rack" %} —</option>
                                 {% for rack in racks %}
-                                <option value="{{ rack.id }}" data-site="{{ rack.site_id }}" data-free="{{ rack.free_port_count }}">{{ rack.name }} · {% if rack.free_port_count %}{{ rack.free_port_count }} {% trans "free ports" %}{% else %}{% trans "no free port" %}{% endif %}</option>
+                                <option value="{{ rack.id }}">{{ rack.name }}</option>
                                 {% endfor %}
                             </select>
-                            <div class="form-text" id="rack_hint">
-                                {% trans "A rack with no free port stays selectable: you can place the device there without cabling it." %}
-                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -186,26 +163,15 @@
                     </div>
                     <div class="card-body">
 
-                        <div id="auto_pick_info" class="alert py-2 px-2 small d-none mb-3"></div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">{% trans "Switch" %}</label>
-                            <select class="form-select" id="switch_select" disabled>
-                                <option value="">— {% trans "Select a rack first" %} —</option>
-                            </select>
-                            <div class="form-text" id="switch_hint">
-                                {% trans "Filled in automatically from the selected rack." %}
-                            </div>
-                        </div>
-
                         <div class="mb-3">
                             <label class="form-label fw-bold">{% trans "Switch port" %}</label>
-                            <select class="form-select" name="switch_port" id="switch_port_select" disabled>
-                                <option value="">— {% trans "Select a switch first" %} —</option>
+                            <select class="form-select" name="switch_port">
+                                <option value="">— {% trans "No cabling for now" %} —</option>
+                                {% for port in free_ports %}
+                                <option value="{{ port.id }}">{{ port.device.name }} / {{ port.name }}</option>
+                                {% endfor %}
                             </select>
-                            <div class="form-text" id="port_hint">
-                                {% trans "Ports already in use are shown greyed out with the device connected to them." %}
-                            </div>
+                            <div class="form-text">{% trans "Only" %} <strong>{% trans "free" %}</strong> {% trans "ports are listed" %}</div>
                         </div>
 
                         <div class="mb-3">
@@ -384,12 +350,6 @@
     // ─────────────────────────────────────────────────────────────────
     // Vérification conflit IP (appel AJAX au blur du champ)
     // ─────────────────────────────────────────────────────────────────
-    // NB : ipInput DOIT être déclaré avant sa première utilisation.
-    // Un `const` n'est pas "hissé" comme un `var` : l'utiliser plus haut
-    // lève un ReferenceError (temporal dead zone) qui tue tout le reste du
-    // bloc de script. C'est ce qui cassait silencieusement les modales et
-    // l'auto-remplissage du câblage.
-    const ipInput = document.getElementById('ip_address_input');
     const ipConflictWarning = document.getElementById('ip_conflict_warning');
     const ipConflictMsg = document.getElementById('ip_conflict_msg');
 
@@ -415,6 +375,7 @@
     // ─────────────────────────────────────────────────────────────────
     // IP address : autoriser uniquement chiffres, points et slash
     // ─────────────────────────────────────────────────────────────────
+    const ipInput = document.getElementById('ip_address_input');
     if (ipInput) {
         ipInput.addEventListener('keydown', function (e) {
             // Autoriser : chiffres, . / et touches de contrôle
@@ -569,296 +530,5 @@
             this.disabled = false;
         }
     });
-
-    /* ═══════════════════════════════════════════════════════════════════════
-       Cascade de câblage :  Site → Baie → Switch → Port
-       ═══════════════════════════════════════════════════════════════════════
-       Chaque niveau reste VERROUILLÉ tant que le niveau au-dessus n'est pas
-       choisi : on rend impossible à l'écran ce qui est impossible dans la
-       réalité, au lieu de laisser composer une combinaison absurde (un port
-       du switch de Dunkerque pour un équipement posé à Winnezeele) et de
-       renvoyer une erreur après validation.
-
-       ⚠ PIÈGE NETBOX : NetBox enveloppe chaque <select class="form-select">
-       dans un widget TomSelect. Le <select> natif est alors masqué
-       (aria-hidden, classe ts-hidden-accessible) et l'utilisateur ne voit
-       plus que le widget. Modifier les <option> du select natif ne se voit
-       donc PAS à l'écran tant qu'on n'a pas resynchronisé TomSelect —
-       symptôme : "le code marche dans le DOM mais rien ne bouge".
-       Tout passe par les helpers fill()/enable() ci-dessous.
-
-       Aucune décision métier ici : services/cabling.py renvoie déjà l'état de
-       chaque switch et de chaque port. Le champ POSTé reste `switch_port` :
-       le formulaire Django est inchangé.
-    */
-    (function () {
-        const siteSel   = document.getElementById('site_select');
-        const rackSel   = document.getElementById('rack_select');
-        const switchSel = document.getElementById('switch_select');
-        const portSel   = document.getElementById('switch_port_select');
-        const info      = document.getElementById('auto_pick_info');
-        const rackHint   = document.getElementById('rack_hint');
-        const switchHint = document.getElementById('switch_hint');
-        const portHint   = document.getElementById('port_hint');
-        if (!siteSel || !rackSel || !switchSel || !portSel) return;
-
-        const PORTS_URL = "{% url 'plugins:netbox_device_search:api_get_rack_ports' 0 %}";
-        const urlFor = (rackId) => PORTS_URL.replace('/0/', '/' + rackId + '/');
-
-        const T = {
-            pickSiteFst:   "{% filter escapejs %}{% trans "Select a site first" %}{% endfilter %}",
-            pickRack:      "{% filter escapejs %}{% trans "Select a rack" %}{% endfilter %}",
-            pickRackFst:   "{% filter escapejs %}{% trans "Select a rack first" %}{% endfilter %}",
-            pickSwitch:    "{% filter escapejs %}{% trans "Select a switch" %}{% endfilter %}",
-            pickSwitchFst: "{% filter escapejs %}{% trans "Select a switch first" %}{% endfilter %}",
-            noCabling:     "{% filter escapejs %}{% trans "No cabling for now" %}{% endfilter %}",
-            noRack:        "{% filter escapejs %}{% trans "No rack" %}{% endfilter %}",
-            freePorts:     "{% filter escapejs %}{% trans "Free ports" %}{% endfilter %}",
-            usedPorts:     "{% filter escapejs %}{% trans "Ports already in use" %}{% endfilter %}",
-            full:          "{% filter escapejs %}{% trans "full" %}{% endfilter %}"
-        };
-
-        /* ══ Adaptateur TomSelect ════════════════════════════════════════════
-           fill()   : reconstruit les <option> natifs PUIS resynchronise le
-                      widget. `groups` = [{label, items:[{value,label,disabled}]}]
-                      ; un label de groupe vide ⇒ pas de <optgroup>.
-           enable() : verrouille/déverrouille les deux (natif + widget).
-           TomSelect conserve l'attribut `disabled` d'une <option> : il retire
-           son data-selectable, donc elle reste visible mais non cliquable —
-           exactement ce qu'on veut pour un switch plein ou un port occupé. */
-
-        function fill(select, placeholder, groups) {
-            const label = '— ' + placeholder + ' —';
-            select.innerHTML = '';
-
-            const ph = document.createElement('option');
-            ph.value = '';
-            ph.textContent = label;
-            select.appendChild(ph);
-
-            (groups || []).forEach(function (group) {
-                const parent = group.label
-                    ? select.appendChild(Object.assign(
-                        document.createElement('optgroup'), { label: group.label }))
-                    : select;
-                group.items.forEach(function (item) {
-                    const opt = document.createElement('option');
-                    opt.value = item.value;
-                    opt.textContent = item.label;
-                    if (item.disabled) opt.disabled = true;
-                    parent.appendChild(opt);
-                });
-            });
-            select.value = '';
-
-            const ts = select.tomselect;
-            if (!ts) return;                       // widget pas encore initialisé
-            ts.clearOptions();                     // vide les options du widget
-            ts.clearCache();                       // ...et le HTML mis en cache
-            ts.sync();                             // relit les <option> natifs
-            ts.settings.placeholder = label;
-            if (ts.control_input) ts.control_input.placeholder = label;
-            ts.refreshOptions(false);
-        }
-
-        function enable(select, on) {
-            select.disabled = !on;
-            const ts = select.tomselect;
-            if (ts) { on ? ts.enable() : ts.disable(); }
-        }
-
-        function setInfo(kind, html) {
-            info.className = 'alert py-2 px-2 small mb-3 alert-' + kind;
-            info.innerHTML = html;
-        }
-        function hideInfo() { info.className = 'alert py-2 px-2 small d-none mb-3'; }
-
-        /* ══ Étage 2 : les baies du site ═════════════════════════════════════
-           La liste complète est rendue par le serveur puis mémorisée ici. On
-           reconstruit ensuite le <select> à chaque changement de site : plus
-           fiable que masquer des <option>, car un <option hidden> reste
-           sélectionnable au clavier et TomSelect l'afficherait quand même. */
-        const ALL_RACKS = Array.from(rackSel.querySelectorAll('option'))
-            .filter(o => o.value)
-            .map(o => ({
-                value: o.value,
-                label: o.textContent.trim(),
-                site: o.dataset.site,
-                free: parseInt(o.dataset.free || '0', 10),
-            }));
-
-        let switches = [];
-
-        function lockRack() {
-            fill(rackSel, T.pickSiteFst, []);
-            enable(rackSel, false);
-            rackHint.textContent = '';
-            lockSwitch();
-        }
-
-        function unlockRack(siteId) {
-            const racks = ALL_RACKS.filter(r => r.site === siteId);
-            fill(rackSel, racks.length ? T.pickRack : T.noRack, [{
-                label: '',
-                items: racks.map(r => ({ value: r.value, label: r.label })),
-            }]);
-            enable(rackSel, racks.length > 0);
-            rackHint.textContent = racks.length
-                ? racks.length + ' baie(s) sur ce site.'
-                : 'Aucune baie sur ce site — l\'équipement sera créé sans baie.';
-            lockSwitch();
-        }
-
-        function lockSwitch() {
-            switches = [];
-            fill(switchSel, T.pickRackFst, []);
-            enable(switchSel, false);
-            switchHint.textContent = '';
-            lockPort();
-        }
-
-        function lockPort() {
-            fill(portSel, T.pickSwitchFst, []);
-            enable(portSel, false);
-            portHint.textContent = '';
-        }
-
-        /* ══ Étage 3 : les switches de la baie ═══════════════════════════════ */
-
-        async function loadSwitches(rackId) {
-            switchHint.textContent = '…';
-            let data;
-            try {
-                const res = await fetch(urlFor(rackId), {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                data = await res.json();
-            } catch (e) {
-                lockSwitch();
-                setInfo('danger', '<i class="mdi mdi-wifi-off"></i> Erreur réseau : ' + e.message);
-                return;
-            }
-            if (!data.success) {
-                lockSwitch();
-                setInfo('danger', data.error || 'Erreur inattendue');
-                return;
-            }
-
-            switches = data.switches || [];
-            lockPort();
-
-            if (!switches.length) {
-                fill(switchSel, T.pickRackFst, []);
-                enable(switchSel, false);
-                switchHint.textContent = '';
-                setInfo('warning',
-                    '<i class="mdi mdi-alert-outline"></i> Aucun switch dans la baie <strong>'
-                    + data.rack_name + '</strong> ni ailleurs sur le site. '
-                    + 'Vérifiez que vos switches portent bien le rôle « switch » ou « router ».');
-                return;
-            }
-
-            fill(switchSel, T.pickSwitch, [{
-                label: '',
-                items: switches.map(sw => ({
-                    value: sw.id,
-                    label: sw.name
-                        + (sw.position ? ' — U' + sw.position : '')
-                        + '  ·  ' + (sw.free_count
-                            ? sw.free_count + '/' + sw.total_count + ' ports libres'
-                            : T.full),
-                    disabled: sw.free_count === 0,   // switch plein : visible, non cliquable
-                })),
-            }]);
-            enable(switchSel, true);
-
-            const usable = switches.filter(s => s.free_count > 0).length;
-            if (data.scope === 'rack') {
-                switchHint.textContent = usable + '/' + switches.length
-                    + ' switch(es) utilisable(s) dans la baie ' + data.rack_name + '.';
-                setInfo('success',
-                    '<i class="mdi mdi-check-circle-outline"></i> Baie <strong>'
-                    + data.rack_name + '</strong> — <strong>' + data.free_total
-                    + '</strong> ports libres au total. Choisissez le switch, puis le port.');
-            } else {
-                const scopeLabel = data.scope === 'location' ? 'la même salle' : 'le même site';
-                switchHint.textContent = 'Switches situés hors de la baie choisie.';
-                setInfo('warning',
-                    '<i class="mdi mdi-alert-outline"></i> Aucun switch dans la baie <strong>'
-                    + data.rack_name + '</strong>. Switches proposés depuis ' + scopeLabel + '.');
-            }
-        }
-
-        /* ══ Étage 4 : les ports du switch ═══════════════════════════════════ */
-
-        function fillPorts(switchId) {
-            const sw = switches.find(s => String(s.id) === String(switchId));
-            if (!sw) { lockPort(); return; }
-
-            const free = sw.ports.filter(p => p.free);
-            const used = sw.ports.filter(p => !p.free);
-            const groups = [];
-
-            if (free.length) {
-                groups.push({
-                    label: T.freePorts + ' (' + free.length + ')',
-                    items: free.map(p => ({ value: p.id, label: p.name })),
-                });
-            }
-            if (used.length) {
-                // Montrés mais désactivés : les masquer donnerait l'impression
-                // qu'il manque des ports sur le switch.
-                groups.push({
-                    label: T.usedPorts + ' (' + used.length + ')',
-                    items: used.map(p => ({
-                        value: p.id,
-                        label: p.name + (p.occupied_by ? '  →  ' + p.occupied_by : ''),
-                        disabled: true,
-                    })),
-                });
-            }
-
-            fill(portSel, T.noCabling, groups);
-            enable(portSel, true);
-            portHint.innerHTML = '<strong>' + free.length + '</strong> port(s) libre(s) sur '
-                + sw.total_count + ' — les ports occupés sont grisés, avec l\'équipement branché.';
-        }
-
-        /* ══ Évènements ══════════════════════════════════════════════════════
-           TomSelect relaie ses sélections en déclenchant un `change` sur le
-           <select> natif : écouter le natif suffit, pas besoin de s'accrocher
-           aux évènements internes du widget. */
-
-        siteSel.addEventListener('change', function () {
-            hideInfo();
-            if (!this.value) { lockRack(); return; }
-            unlockRack(this.value);
-        });
-
-        rackSel.addEventListener('change', function () {
-            hideInfo();
-            if (!this.value) { lockSwitch(); return; }
-            loadSwitches(this.value);
-        });
-
-        switchSel.addEventListener('change', function () {
-            if (!this.value) { lockPort(); return; }
-            fillPorts(this.value);
-        });
-
-        /* Démarrage : on attend que NetBox ait initialisé ses TomSelect.
-           Le setTimeout(0) passe la main à la fin de la file de tâches, donc
-           APRÈS les autres gestionnaires de DOMContentLoaded — sinon on
-           configurerait des widgets qui n'existent pas encore. */
-        function boot() {
-            lockRack();
-            if (siteSel.value) unlockRack(siteSel.value);
-        }
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 0));
-        } else {
-            setTimeout(boot, 0);
-        }
-    })();
 </script>
 {% endblock %}

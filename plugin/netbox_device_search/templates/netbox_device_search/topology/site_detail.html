@@ -1,0 +1,84 @@
+{% extends 'base/layout.html' %}
+{% load i18n %}
+
+{% block title %}{{ site.name }} — {% trans "Racks" %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">
+            <i class="mdi mdi-map-marker text-primary"></i> {{ site.name }}
+        </h2>
+        <div class="d-flex gap-2 align-items-center">
+            <a href="{% url 'plugins:netbox_device_search:site_browser' %}" class="btn btn-outline-secondary">
+                <i class="mdi mdi-arrow-left"></i> {% trans "All sites" %}
+            </a>
+            <div class="border-start border-secondary ps-2 ms-1">
+                {% include 'netbox_device_search/_lang_switcher.html' %}
+            </div>
+        </div>
+    </div>
+
+    {# ── Datacenters (Locations) et leurs baies ── #}
+    {% for location in locations %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                <i class="mdi mdi-office-building" style="color:#8B5CF6;"></i>
+                <strong>{{ location.name }}</strong>
+            </span>
+            <span class="badge bg-secondary">{{ location.rack_count }} {% trans "rack(s)" %}</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                {% for rack in location.racks.all %}
+                <div class="col-md-3">
+                    <a href="{% url 'plugins:netbox_device_search:rack_detail' rack.id %}"
+                       class="card h-100 text-decoration-none text-reset border-start border-info border-4">
+                        <div class="card-body py-3">
+                            <div class="fw-bold"><i class="mdi mdi-server"></i> {{ rack.name }}</div>
+                            <small class="text-muted">{{ rack.device_count }} {% trans "device(s)" %}</small>
+                        </div>
+                    </a>
+                </div>
+                {% empty %}
+                <p class="text-muted mb-0">{% trans "No rack in this datacenter." %}</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {# ── Baies hors datacenter (rack.location vide) ── #}
+    {% if racks_sans_datacenter %}
+    <div class="card shadow-sm mb-4 border-start border-warning border-4">
+        <div class="card-header">
+            <i class="mdi mdi-server-off text-warning"></i>
+            <strong>{% trans "Racks not in a datacenter" %}</strong>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                {% for rack in racks_sans_datacenter %}
+                <div class="col-md-3">
+                    <a href="{% url 'plugins:netbox_device_search:rack_detail' rack.id %}"
+                       class="card h-100 text-decoration-none text-reset border-start border-info border-4">
+                        <div class="card-body py-3">
+                            <div class="fw-bold"><i class="mdi mdi-server"></i> {{ rack.name }}</div>
+                            <small class="text-muted">{{ rack.device_count }} {% trans "device(s)" %}</small>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not locations and not racks_sans_datacenter %}
+    <div class="alert alert-info">{% trans "This site has no rack yet." %}</div>
+    {% endif %}
+
+</div>
+{% endblock %}
